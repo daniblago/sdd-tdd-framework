@@ -1,0 +1,19 @@
+# Extensiones de sistema
+*.dll
+*.exe
+*.DAT
+*.blf
+*.regtrans-ms
+*.log
+
+# Carpetas de configuración
+.vscode/
+.claude/
+.copilot/
+node_modules/
+bin/
+obj/
+
+# Archivos temporales de Windows
+Thumbs.db
+desktop.ini
