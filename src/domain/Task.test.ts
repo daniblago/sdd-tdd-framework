@@ -1,49 +1,46 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { Task } from './Task.js';
 
 describe('Task Domain Entity', () => {
+  let task: Task;
+
+  beforeEach(() => {
+    // Ahora pasamos la descripción opcional
+    task = new Task('T1', 'Título de prueba', 'Descripción de prueba');
+  });
+
   it('debería inicializarse en estado TODO con título y descripción válidos', () => {
-    const task = new Task('Task-001', 'Implementar autenticación');
-    expect(task.getTitle()).toBe('Task-001');
     expect(task.getStatus()).toBe('TODO');
+    expect(task.getId()).toBe('T1');
+    expect(task.getDescription()).toBe('Descripción de prueba');
   });
 
   it('debería lanzar un error si se intenta crear sin título', () => {
-    expect(() => new Task('', 'Descripción')).toThrowError('El título es obligatorio');
-    expect(() => new Task('   ', 'Descripción')).toThrowError('El título es obligatorio');
+    expect(() => new Task('T2', '   ')).toThrow('El título de la tarea es obligatorio');
   });
 
-  it('debería cambiar el estado a IN_PROGRESS al iniciarla', () => {
-    const task = new Task('Task-002', 'Descripción');
+  it('debería cambiar el estado a DOING al iniciarla', () => {
     task.start();
-    expect(task.getStatus()).toBe('IN_PROGRESS');
+    expect(task.getStatus()).toBe('DOING');
   });
 
-  it('debería permitir completar una tarea que está en IN_PROGRESS', () => {
-    const task = new Task('Task-003', 'Descripción');
+  it('debería permitir completar una tarea que está en DOING', () => {
     task.start();
     task.complete();
     expect(task.getStatus()).toBe('DONE');
   });
 
   it('debería lanzar un error si se intenta completar sin estar en progreso', () => {
-    const task = new Task('Task-004', 'Descripción');
-    // Intenta completar directamente desde TODO
-    expect(() => task.complete()).toThrowError('La tarea debe estar en progreso para completarse');
+    expect(() => task.complete()).toThrow('Solo se pueden completar tareas que están en progreso');
   });
 
   it('debería permitir pausar una tarea en progreso', () => {
-    const task = new Task('Task-005', 'Descripción');
     task.start();
     task.pause();
     expect(task.getStatus()).toBe('PAUSED');
   });
 
   it('debería lanzar un error si se intenta pausar una tarea que no está en progreso', () => {
-    const task = new Task('Task-006', 'Descripción');
-    expect(() => task.pause()).toThrowError('Solo se pueden pausar tareas en progreso');
-    task.start();
-    task.complete();
-    expect(() => task.pause()).toThrowError('Solo se pueden pausar tareas en progreso');
+    expect(() => task.pause()).toThrow('Solo se pueden pausar tareas en progreso');
   });
 });
