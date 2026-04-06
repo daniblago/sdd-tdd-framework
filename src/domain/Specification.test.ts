@@ -39,4 +39,12 @@ describe('Specification Domain Entity', () => {
     spec.requestReview();
     expect(spec.getStatus()).toBe('REVIEW');
   });
+
+  it('debería lanzar un error si se intenta solicitar revisión desde un estado que no sea DRAFT o REJECTED', () => {
+    const spec = new Specification('Spec-006', 'Descripción');
+    spec.requestReview(); // Pasa a REVIEW
+    expect(() => spec.requestReview()).toThrowError('Estado invalido');
+    spec.approve(); // Pasa a APPROVED
+    expect(() => spec.requestReview()).toThrowError('Estado invalido');
+  });
 });

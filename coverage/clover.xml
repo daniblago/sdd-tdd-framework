@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<coverage generated="1775441343614" clover="3.2.0">
+  <project timestamp="1775441343614" name="All files">
+    <metrics statements="51" coveredstatements="51" conditionals="29" coveredconditionals="29" methods="17" coveredmethods="17" elements="97" coveredelements="97" complexity="0" loc="51" ncloc="51" packages="2" files="3" classes="3"/>
+    <package name="application">
+      <metrics statements="8" coveredstatements="8" conditionals="5" coveredconditionals="5" methods="4" coveredmethods="4"/>
+      <file name="SpecManager.ts" path="C:\Users\Daniel B\SDD-TDD-Framework\src\application\SpecManager.ts">
+        <metrics statements="8" coveredstatements="8" conditionals="5" coveredconditionals="5" methods="4" coveredmethods="4"/>
+        <line num="2" count="1" type="cond" truecount="1" falsecount="0"/>
+        <line num="3" count="1" type="stmt"/>
+        <line num="4" count="1" type="cond" truecount="1" falsecount="0"/>
+        <line num="5" count="1" type="cond" truecount="1" falsecount="0"/>
+        <line num="6" count="1" type="cond" truecount="1" falsecount="0"/>
+        <line num="7" count="1" type="cond" truecount="1" falsecount="0"/>
+        <line num="8" count="1" type="stmt"/>
+        <line num="9" count="1" type="stmt"/>
+      </file>
+    </package>
+    <package name="domain">
+      <metrics statements="43" coveredstatements="43" conditionals="24" coveredconditionals="24" methods="13" coveredmethods="13"/>
+      <file name="Specification.ts" path="C:\Users\Daniel B\SDD-TDD-Framework\src\domain\Specification.ts">
+        <metrics statements="20" coveredstatements="20" conditionals="15" coveredconditionals="15" methods="7" coveredmethods="7"/>
+        <line num="2" count="1" type="cond" truecount="1" falsecount="0"/>
+        <line num="3" count="11" type="stmt"/>
+        <line num="4" count="11" type="cond" truecount="1" falsecount="0"/>
+        <line num="5" count="11" type="cond" truecount="2" falsecount="0"/>
+        <line num="6" count="11" type="stmt"/>
+        <line num="7" count="11" type="cond" truecount="1" falsecount="0"/>
+        <line num="8" count="11" type="cond" truecount="1" falsecount="0"/>
+        <line num="9" count="11" type="cond" truecount="1" falsecount="0"/>
+        <line num="10" count="8" type="cond" truecount="3" falsecount="0"/>
+        <line num="11" count="6" type="stmt"/>
+        <line num="12" count="8" type="stmt"/>
+        <line num="13" count="11" type="cond" truecount="1" falsecount="0"/>
+        <line num="14" count="4" type="cond" truecount="2" falsecount="0"/>
+        <line num="15" count="3" type="stmt"/>
+        <line num="16" count="4" type="stmt"/>
+        <line num="17" count="11" type="cond" truecount="1" falsecount="0"/>
+        <line num="18" count="2" type="cond" truecount="1" falsecount="0"/>
+        <line num="19" count="1" type="stmt"/>
+        <line num="20" count="2" type="stmt"/>
+        <line num="21" count="11" type="stmt"/>
+      </file>
+      <file name="Task.ts" path="C:\Users\Daniel B\SDD-TDD-Framework\src\domain\Task.ts">
+        <metrics statements="23" coveredstatements="23" conditionals="9" coveredconditionals="9" methods="6" coveredmethods="6"/>
+        <line num="3" count="1" type="cond" truecount="1" falsecount="0"/>
+        <line num="4" count="6" type="stmt"/>
+        <line num="6" count="6" type="cond" truecount="1" falsecount="0"/>
+        <line num="7" count="6" type="cond" truecount="2" falsecount="0"/>
+        <line num="8" count="2" type="stmt"/>
+        <line num="9" count="2" type="stmt"/>
+        <line num="10" count="6" type="stmt"/>
+        <line num="12" count="6" type="cond" truecount="1" falsecount="0"/>
+        <line num="13" count="1" type="stmt"/>
+        <line num="14" count="1" type="stmt"/>
+        <line num="16" count="6" type="cond" truecount="1" falsecount="0"/>
+        <line num="17" count="3" type="stmt"/>
+        <line num="18" count="3" type="stmt"/>
+        <line num="20" count="6" type="cond" truecount="1" falsecount="0"/>
+        <line num="21" count="2" type="stmt"/>
+        <line num="22" count="2" type="stmt"/>
+        <line num="24" count="6" type="cond" truecount="1" falsecount="0"/>
+        <line num="25" count="2" type="cond" truecount="1" falsecount="0"/>
+        <line num="26" count="1" type="stmt"/>
+        <line num="27" count="1" type="stmt"/>
+        <line num="28" count="1" type="stmt"/>
+        <line num="29" count="2" type="stmt"/>
+        <line num="30" count="6" type="stmt"/>
+      </file>
+    </package>
+  </project>
+</coverage>

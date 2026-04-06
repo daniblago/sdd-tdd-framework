@@ -1,5 +1,5 @@
 ﻿import { describe, it, expect } from 'vitest';
-import { Specification } from '../../src/domain/Specification';
+import { Specification } from '../../src/domain/Specification.js';
 describe('Specification Entity', () => {
   it('deberia iniciar en DRAFT', () => {
     const spec = new Specification('Test', 'Desc');
