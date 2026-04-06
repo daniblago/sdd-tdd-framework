@@ -1,4 +1,4 @@
-﻿import { Specification } from '../domain/Specification';
+﻿import { Specification } from '../domain/Specification.js';
 export class SpecManager {
   private specs: Specification[] = [];
   registerSpec(spec: Specification): void { this.specs.push(spec); }
