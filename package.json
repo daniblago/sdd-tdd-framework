@@ -5,12 +5,17 @@
   "scripts": {
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "ui": "node dashboard.js"
+    "ui": "cd sdd-frontend && npm run dev"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",
+    "@vitest/coverage-v8": "^2.1.0",
     "typescript": "^5.3.3",
-    "vitest": "^2.1.0",
-    "@vitest/coverage-v8": "^2.1.0"
+    "vitest": "^2.1.0"
+  },
+  "dependencies": {
+    "create-vite": "^9.0.3",
+    "lucide-react": "^1.7.0",
+    "tailwindcss": "^4.2.2"
   }
 }
