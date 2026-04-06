@@ -1,0 +1,62 @@
+[
+  {
+    "id": 1,
+    "title": "1. Constitución",
+    "type": "macro",
+    "file": "constitution.md"
+  },
+  {
+    "id": 2,
+    "title": "2. Glosario de Dominio",
+    "type": "macro",
+    "file": "domain-glossary.md"
+  },
+  {
+    "id": 3,
+    "title": "3. Especificación Funcional (spec.md)",
+    "type": "macro",
+    "file": "specs/001-framework-core/spec.md"
+  },
+  {
+    "id": 4,
+    "title": "4. Arquitectura (C4/ADR)",
+    "type": "macro",
+    "file": ""
+  },
+  {
+    "id": 5,
+    "title": "5. Modelo de Datos",
+    "type": "macro",
+    "file": ""
+  },
+  {
+    "id": 6,
+    "title": "6. Seguridad (RBAC)",
+    "type": "macro",
+    "file": "docs/rbac.md"
+  },
+  {
+    "id": 7,
+    "title": "7. Workflows",
+    "type": "macro",
+    "file": "docs/workflows/aprobacion-especificacion.md"
+  },
+  {
+    "id": 8,
+    "title": "8. Plan Técnico",
+    "type": "macro",
+    "file": ""
+  },
+  {
+    "id": 9,
+    "title": "9. Desglose de Tareas (tasks.md)",
+    "type": "micro",
+    "file": "tasks.md"
+  },
+  {
+    "id": 10,
+    "title": "10. Construcción (Red-Green-Refactor)",
+    "type": "micro",
+    "file": "README.md"
+  }
+]
