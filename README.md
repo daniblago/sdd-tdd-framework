@@ -28,6 +28,15 @@ Fase 9: Desglose de Tareas: Backlog orientado a TDD (tasks.md).
 
 Fase 10: Construcción: Ciclo Red-Green-Refactor asistido por IA.
 
+### 🔄 Cómo usar estas fases (No es Cascada)
+
+El framework no te obliga a ejecutar las 10 fases de forma secuencial todos los días. Se divide en dos mundos de trabajo:
+
+* **🌍 Mundo 1: El Macro-Ciclo (Fases 1 a 8 - Diseño y Arquitectura):** Se ejecuta al inicio del proyecto o cuando hay cambios estructurales (ej. definir una nueva funcionalidad, entidad o regla de negocio). Es planificación, no se hace a diario.
+* **🔄 Mundo 2: El Micro-Ciclo (Fases 9 y 10 - Ejecución y TDD):** Es el bucle iterativo ágil donde el desarrollador vive el 90% del tiempo. Tomas la especificación del Macro-Ciclo, la divides en tareas (Fase 9) y aplicas pruebas y código (Fase 10) repetidamente.
+
+> **Regla Inquebrantable:** NUNCA pases al Micro-Ciclo (Escribir Código) sin tener validado el Macro-Ciclo (Especificación de Diseño).
+
 🛠️ Stack Tecnológico
 
 Lenguaje: TypeScript (NodeNext)
