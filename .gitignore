@@ -1,19 +1,11 @@
-# Extensiones de sistema
-*.dll
-*.exe
-*.DAT
-*.blf
-*.regtrans-ms
-*.log
-
-# Carpetas de configuración
-.vscode/
-.claude/
-.copilot/
+# Dependencias
 node_modules/
-bin/
-obj/
 
-# Archivos temporales de Windows
+# Reportes de Pruebas y Builds
+coverage/
+dist/
+
+# Archivos de Entorno y Sistema Operativo
+.env
+.DS_Store
 Thumbs.db
-desktop.ini
