@@ -92,6 +92,8 @@ workspaceRouter.get('/artifact', async (req: Request, res: Response): Promise<vo
  * Endpoint Proxy para evadir bloqueos de CORS, Firewall y AdBlocks de los navegadores.
  * Despacha de forma segura la llamada al API de Google Gemini vía Node.js nativo (fetch).
  */
+let activeAiModel = 'gemini-1.5-flash';
+
 workspaceRouter.post('/ai-draft', async (req: Request, res: Response): Promise<void> => {
   try {
     const { apiKey, systemPrompt, userPrompt } = req.body;
@@ -102,7 +104,6 @@ workspaceRouter.post('/ai-draft', async (req: Request, res: Response): Promise<v
     }
 
     const cleanedKey = apiKey.trim();
-    let initialModel = 'gemini-1.5-flash';
     
     // Helper funct para llamar generateContent
     const callGenerate = async (model: string) => {
@@ -115,11 +116,11 @@ workspaceRouter.post('/ai-draft', async (req: Request, res: Response): Promise<v
       });
     };
 
-    let response = await callGenerate(initialModel);
+    let response = await callGenerate(activeAiModel);
 
     // Auto-negociación: Si Google nos bloquea el modelo por región/deprecación (404), listamos los modelos
     if (response.status === 404) {
-      console.log(`[Proxy] El modelo ${initialModel} fue rechazado por 404. Negociando modelos disponibles...`);
+      console.log(`[Proxy] El modelo ${activeAiModel} fue averiado (404). Negociando el mejor modelo de reemplazo...`);
       const listReq = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${cleanedKey}`);
       
       if (listReq.ok) {
@@ -132,9 +133,9 @@ workspaceRouter.post('/ai-draft', async (req: Request, res: Response): Promise<v
          );
          
          if (validFallback) {
-            const fallbackModelName = validFallback.name.replace('models/', '');
-            console.log(`[Proxy] Fallback Inteligente activado. Usando: ${fallbackModelName}`);
-            response = await callGenerate(fallbackModelName);
+            activeAiModel = validFallback.name.replace('models/', '');
+            console.log(`[Proxy] Fallback Exitoso. Motor IA actualizado permanentemente a: ${activeAiModel}`);
+            response = await callGenerate(activeAiModel);
          }
       }
     }
