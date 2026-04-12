@@ -61,7 +61,7 @@ workspaceRouter.post('/artifact', async (req: Request, res: Response): Promise<v
     res.status(200).json({ message: 'Artefacto guardado', path: parsed.relativePath });
   } catch (err: any) {
     if (err instanceof z.ZodError) {
-      res.status(400).json({ error: 'Validación fallida', details: err.errors });
+      res.status(400).json({ error: 'Validación fallida', details: err.issues });
     } else {
       res.status(500).json({ error: 'Error interno guardando' });
     }
