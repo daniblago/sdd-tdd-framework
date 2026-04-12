@@ -108,24 +108,24 @@ export default function App() {
     }
     setCopilotLoading(true);
     try {
-      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`;
       const systemPrompt = `Eres el Arquitecto Docente (SpecAgent) IA. Asiste en redactar la fase "${activePhase.title}". Directiva obligatoria: ${getPromptsForPhase(activePhase.id)}`;
       const userPrompt = `A continuación el contenido (puede estar vacío) y mi contexto. Enriquece el documento.\nContexto actual:\n${currentContent || '(vacío)'}\nRedacta usando formato Markdown estructurado y estrictamente técnico.`;
 
-      const res = await fetch(geminiUrl, {
+      const res = await fetch('/api/workspace/ai-draft', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ role: 'user', parts: [{ text: `Sistema: ${systemPrompt}\nRequerimiento humano: ${userPrompt}` }] }]
-        })
+        body: JSON.stringify({ apiKey, systemPrompt, userPrompt })
       });
       const data = await res.json();
       
-      if (res.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
-        setCurrentContent(prev => prev + '\n\n' + data.candidates[0].content.parts[0].text);
+      if (res.ok && data.text) {
+        setCurrentContent(prev => prev + (prev.trim() ? '\n\n' : '') + data.text);
+      } else {
+        alert(`❌ El Agente IA fue bloqueado por Node.\n\nServidor Gemini devolvió: ${data?.error?.message || 'Token inválido o error de conexión'}.\n\nRevisa tu Llave IA en el Panel Lateral.`);
       }
     } catch(err) {
-       console.error("AI fetch exception");
+       console.error("AI fetch exception", err);
+       alert("❌ Imposible contactar con el Proxy de Node. Revisa tu consola de servidor local.");
     }
     setCopilotLoading(false);
   };
@@ -216,7 +216,14 @@ export default function App() {
               className="flex items-center gap-2 px-3 py-2 text-[12px] font-semibold text-gray-600 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-300 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-lg transition-colors border border-gray-200 dark:border-transparent dark:hover:border-zinc-700"
             >
               <Key size={14}/>
-              Validar Llave IA
+              <span className="flex items-center gap-2">
+                Llave IA
+                {apiKey ? (
+                   <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]" title="Agente Armado y Listo"></span>
+                ) : (
+                   <span className="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)] animate-pulse" title="Falta Llave de Autenticación"></span>
+                )}
+              </span>
             </button>
             
             <button 
