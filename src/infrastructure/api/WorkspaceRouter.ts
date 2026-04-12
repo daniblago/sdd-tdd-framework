@@ -3,51 +3,80 @@ import { z } from 'zod';
 import { SaveArtifactUseCase } from '../../application/usecases/SaveArtifactUseCase.js';
 import { ReadArtifactUseCase } from '../../application/usecases/ReadArtifactUseCase.js';
 import { LocalFileSystemAdapter } from '../filesystem/LocalFileSystemAdapter.js';
+import * as fs from 'fs/promises';
+import * as path from 'path';
 
 export const workspaceRouter = Router();
 
-// Esquema de validación usando Zod (Clean Architecture: Validación estricta en el Controller)
+const DEFAULT_WORKSPACES_DIR = path.join(process.cwd(), 'workspaces');
+
+// Ensure base dir exists
+const ensureWorkspacesDir = async () => {
+   try { await fs.mkdir(DEFAULT_WORKSPACES_DIR, { recursive: true }); } catch (e) {}
+}
+ensureWorkspacesDir();
+
+const getUseCasesForProject = (projectName: string) => {
+  const projectRoot = path.join(DEFAULT_WORKSPACES_DIR, projectName);
+  const fsAdapter = new LocalFileSystemAdapter(projectRoot);
+  return {
+    saveArtifactUseCase: new SaveArtifactUseCase(fsAdapter),
+    readArtifactUseCase: new ReadArtifactUseCase(fsAdapter)
+  };
+};
+
 const SaveArtifactSchema = z.object({
+  projectName: z.string().min(1, 'El projectName es requerido'),
   relativePath: z.string().min(1, 'El relativePath es requerido'),
   content: z.string()
 });
 
-// Composición manual de dependencias
-const workspaceRoot = process.cwd(); 
-const fsAdapter = new LocalFileSystemAdapter(workspaceRoot);
-const saveArtifactUseCase = new SaveArtifactUseCase(fsAdapter);
-const readArtifactUseCase = new ReadArtifactUseCase(fsAdapter);
+workspaceRouter.get('/projects', async (req: Request, res: Response): Promise<void> => {
+   try {
+     const entries = await fs.readdir(DEFAULT_WORKSPACES_DIR, { withFileTypes: true });
+     const projects = entries.filter(e => e.isDirectory()).map(e => e.name);
+     res.status(200).json({ projects });
+   } catch(err) {
+     res.status(500).json({ error: 'Error leyendo proyectos' });
+   }
+});
 
-/**
- * Endpoints para sobrescribir o crear cualquier artefacto en el Local Workspace.
- * Payload esperado: { "relativePath": "tasks.md", "content": "..." }
- */
+workspaceRouter.post('/projects', async (req: Request, res: Response): Promise<void> => {
+   try {
+     const { projectName } = req.body;
+     if (!projectName) { res.status(400).json({ error: 'projectName requerido' }); return; }
+     const targetPath = path.join(DEFAULT_WORKSPACES_DIR, projectName);
+     await fs.mkdir(targetPath, { recursive: true });
+     res.status(200).json({ message: 'OK', project: projectName });
+   } catch(err) {
+     res.status(500).json({ error: 'Error creando proyecto' });
+   }
+});
+
 workspaceRouter.post('/artifact', async (req: Request, res: Response): Promise<void> => {
   try {
     const parsed = SaveArtifactSchema.parse(req.body);
+    const { saveArtifactUseCase } = getUseCasesForProject(parsed.projectName);
     await saveArtifactUseCase.execute(parsed.relativePath, parsed.content);
-    res.status(200).json({ message: 'Artefacto guardado exitosamente', path: parsed.relativePath });
+    res.status(200).json({ message: 'Artefacto guardado', path: parsed.relativePath });
   } catch (err: any) {
     if (err instanceof z.ZodError) {
       res.status(400).json({ error: 'Validación fallida', details: err.errors });
     } else {
-      console.error('[Error en WorkspaceRouter]:', err);
-      res.status(500).json({ error: 'Error interno del servidor guardando el artefacto' });
+      res.status(500).json({ error: 'Error interno guardando' });
     }
   }
 });
 
-/**
- * Endpoints para leer un artefacto del Local Workspace.
- * Query string esperado: ?relativePath=tasks.md
- */
 workspaceRouter.get('/artifact', async (req: Request, res: Response): Promise<void> => {
   try {
     const relativePath = req.query.relativePath as string;
-    if (!relativePath) {
-      res.status(400).json({ error: 'Falta el parámetro relativePath' });
+    const projectName = req.query.projectName as string;
+    if (!relativePath || !projectName) {
+      res.status(400).json({ error: 'Faltan parámetros relativePath o projectName' });
       return;
     }
+    const { readArtifactUseCase } = getUseCasesForProject(projectName);
     const content = await readArtifactUseCase.execute(relativePath);
     if (content === null) {
       res.status(404).json({ error: 'Artefacto no encontrado' });
@@ -55,8 +84,7 @@ workspaceRouter.get('/artifact', async (req: Request, res: Response): Promise<vo
     }
     res.status(200).send(content);
   } catch (err: any) {
-    console.error('[Error en WorkspaceRouter GET]:', err);
-    res.status(500).json({ error: 'Error interno del servidor leyendo el artefacto' });
+    res.status(500).json({ error: 'Error interno leyendo' });
   }
 });
 
@@ -111,7 +139,14 @@ workspaceRouter.post('/ai-draft', async (req: Request, res: Response): Promise<v
       }
     }
 
-    const data = await response.json();
+    const textData = await response.text();
+    let data;
+    try {
+      data = JSON.parse(textData);
+    } catch(e) {
+      data = { error: { message: "Error in-parseable de Gemini: " + textData.substring(0, 100) } };
+    }
+    
     if (!response.ok) {
        res.status(response.status).json(data);
        return;
@@ -121,6 +156,6 @@ workspaceRouter.post('/ai-draft', async (req: Request, res: Response): Promise<v
     res.status(200).json({ text: outputText });
   } catch (err: any) {
     console.error('[Error en AI Proxy Node]:', err);
-    res.status(500).json({ error: 'Fallo fatal en el servidor proxy conectando con Gemini.' });
+    res.status(500).json({ error: 'Fallo fatal en proxy remoto', details: err.message });
   }
 });

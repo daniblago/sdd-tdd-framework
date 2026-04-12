@@ -42,6 +42,53 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [copilotLoading, setCopilotLoading] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
+  
+  // Workspace Projects
+  const [projectsList, setProjectsList] = useState([]);
+  const [activeProject, setActiveProject] = useState(() => localStorage.getItem('sdd_active_project') || '');
+
+  // Load Projects on Boot
+  useEffect(() => {
+    if (serverMode) {
+      fetch('/api/workspace/projects')
+        .then(res => res.json())
+        .then(data => {
+          if (data.projects) setProjectsList(data.projects);
+          if (data.projects.length > 0 && !activeProject) {
+            setActiveProject(data.projects[0]);
+          }
+        })
+        .catch(() => console.error('Error cargando lista de proyectos'));
+    }
+  }, [serverMode]);
+
+  // Persist Active Project Config
+  useEffect(() => {
+    if (activeProject) localStorage.setItem('sdd_active_project', activeProject);
+  }, [activeProject]);
+
+  // Create Project Helper
+  const handleCreateProject = async () => {
+    const name = window.prompt("Introduce un identificador para el nuevo proyecto (sin espacios):");
+    if (!name?.trim()) return;
+    const sanitized = name.trim().replace(/[^a-z0-9_-]/gi, '-').toLowerCase();
+    
+    try {
+      const res = await fetch('/api/workspace/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectName: sanitized })
+      });
+      if (res.ok) {
+         setProjectsList(prev => prev.includes(sanitized) ? prev : [...prev, sanitized]);
+         setActiveProject(sanitized);
+      } else {
+         alert("Fallo creando el directorio del proyecto.");
+      }
+    } catch (e) {
+      alert("Error de conexión al crear proyecto.");
+    }
+  };
 
   // Apply dark mode to Document
   useEffect(() => {
@@ -51,12 +98,14 @@ export default function App() {
 
   // Bulk Load on Background to populate Checklist Checkmarks
   useEffect(() => {
+    setVfs({}); // Volver a cero al cambiar proyecto
+    
     const fetchAllPhasesBackground = async () => {
-      if (serverMode) {
-        const newVfs = { ...vfs };
+      if (serverMode && activeProject) {
+        const newVfs = {};
         for (const phase of PHASES) {
           try {
-            const response = await fetch(`/api/workspace/artifact?relativePath=${encodeURIComponent(phase.file)}`);
+            const response = await fetch(`/api/workspace/artifact?relativePath=${encodeURIComponent(phase.file)}&projectName=${encodeURIComponent(activeProject)}`);
             if (response.ok) {
               newVfs[phase.file] = await response.text();
             }
@@ -68,7 +117,7 @@ export default function App() {
       }
     };
     fetchAllPhasesBackground();
-  }, [serverMode]);
+  }, [serverMode, activeProject]);
 
   // Sync Editor when tab changes
   useEffect(() => {
@@ -77,15 +126,25 @@ export default function App() {
 
   // Save current step and go to next
   const handleSaveAndContinue = async () => {
+    if (!currentContent?.trim()) {
+      alert("❌ Tu área de trabajo está vacía. No se puede avanzar de fase sin arquitectura documentada.");
+      return;
+    }
+
     setIsSaving(true);
     let newVfsState = { ...vfs, [activePhase.file]: currentContent };
     
     if (serverMode) {
+      if (!activeProject) {
+        alert("¡Alto arquitecto! Debes crear o seleccionar un Proyecto Activo en la barra lateral antes de persistir en tu disco físico.");
+        setIsSaving(false);
+        return;
+      }
       try {
         await fetch('/api/workspace/artifact', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ relativePath: activePhase.file, content: currentContent })
+          body: JSON.stringify({ projectName: activeProject, relativePath: activePhase.file, content: currentContent })
         });
       } catch (error) {
         console.error('Error guardando proxy local', error);
@@ -108,8 +167,20 @@ export default function App() {
     }
     setCopilotLoading(true);
     try {
-      const systemPrompt = `Eres el Arquitecto Docente (SpecAgent) IA. Asiste en redactar la fase "${activePhase.title}". Directiva obligatoria: ${getPromptsForPhase(activePhase.id)}`;
-      const userPrompt = `A continuación el contenido (puede estar vacío) y mi contexto. Enriquece el documento.\nContexto actual:\n${currentContent || '(vacío)'}\nRedacta usando formato Markdown estructurado y estrictamente técnico.`;
+      // 🧠 Motor de Memoria Histórica Continua
+      let memoryContext = "";
+      for (let i = 0; i < activePhaseIndex; i++) {
+        const pastPhase = PHASES[i];
+        const content = vfs[pastPhase.file];
+        if (content && content.trim().length > 50) {
+          memoryContext += `\n\n[MEMORIA FASE ${pastPhase.id} - ${pastPhase.title}]:\n${content}`;
+        }
+      }
+
+      const memoryPrompt = memoryContext ? `\n\nCONOCIMIENTO ACUMULADO DEL PROYECTO (USAR COMO BASE ESTRICTA):${memoryContext}` : '';
+
+      const systemPrompt = `Eres el Arquitecto Docente (SpecAgent) IA. Asiste asertivamente en redactar y expandir la fase "${activePhase.title}". Directiva obligatoria: ${getPromptsForPhase(activePhase.id)}`;
+      const userPrompt = `Por favor genera el contenido para la fase actual. ${memoryPrompt}\n\nCONTENIDO ACTUAL DE LA FASE ACTIVA (Enriquecer o Autocompletar):\n${currentContent?.trim() ? currentContent : '(vacío, diséñalo interactuando con la memoria)'}\n\nRedacta en formato Markdown profesional y técnico.`;
 
       const res = await fetch('/api/workspace/ai-draft', {
         method: 'POST',
@@ -120,6 +191,8 @@ export default function App() {
       
       if (res.ok && data.text) {
         setCurrentContent(prev => prev + (prev.trim() ? '\n\n' : '') + data.text);
+      } else if (res.ok && !data.text) {
+        alert("⚠️ El Agente IA procesó el contexto histórico sin errores de red, pero devolvió un texto vacío.\n\nEsto suele suceder cuando Google Gemini detecta alguna palabra en tu Constitución previa (Phase 1) que activa sus filtros internos de seguridad (Safety Block), obligándolo a censurar la respuesta.\n\nPrueba agregar una frase base tú mismo en este recuadro antes de pulsar el botón.");
       } else {
         alert(`❌ El Agente IA fue bloqueado por Node.\n\nServidor Gemini devolvió: ${data?.error?.message || 'Token inválido o error de conexión'}.\n\nRevisa tu Llave IA en el Panel Lateral.`);
       }
@@ -148,6 +221,31 @@ export default function App() {
              <Layers size={18} />
           </div>
           <h1 className="font-extrabold text-lg tracking-tight outfit-font text-gray-900 dark:text-white">Factoría SDD</h1>
+        </div>
+
+        {/* Selector de Workspace */}
+        <div className="px-5 py-4 border-b border-gray-100 dark:border-zinc-800/80 bg-gray-50/50 dark:bg-[#0c0c0e]/30 shrink-0">
+           <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400 mb-2">Workspace Activo</div>
+           <div className="flex items-center gap-2">
+             <select 
+                value={activeProject}
+                onChange={(e) => setActiveProject(e.target.value)}
+                disabled={!serverMode}
+                className="flex-1 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 text-xs font-bold text-gray-700 dark:text-gray-200 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 appearance-none shadow-sm cursor-pointer"
+             >
+                <option value="" disabled>Selecciona...</option>
+                {projectsList.map(p => <option key={p} value={p}>{p}</option>)}
+             </select>
+             <button 
+                onClick={handleCreateProject}
+                disabled={!serverMode}
+                className="px-3 py-2 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 font-bold rounded-lg border border-indigo-100 dark:border-indigo-500/20 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 disabled:opacity-50 transition-colors shadow-sm"
+                title="Generar Nuevo Proyecto"
+             >
+                +
+             </button>
+           </div>
+           {!serverMode && <p className="text-[10px] text-amber-600 dark:text-amber-500 mt-2 font-medium leading-tight">Activa el Disco Físico (abajo) para habilitar directorios aislados.</p>}
         </div>
 
         {/* Lista Clicleable Checklist */}
@@ -337,15 +435,27 @@ export default function App() {
 
           {/* Floating Save Action */}
           <div className="sticky bottom-8 flex justify-end">
-             <button
-               onClick={handleSaveAndContinue}
-               disabled={isSaving || isLoading}
-               className="group flex flex-1 w-full justify-center lg:flex-none lg:w-auto items-center gap-3 px-10 py-5 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 font-extrabold uppercase tracking-wide text-xs rounded-2xl shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)] transition-all transform hover:-translate-y-1 disabled:opacity-50"
-             >
-               <Save size={18} />
-               Validar Documento y Avanzar Fase
-               <ArrowRight size={18} className="group-hover:translate-x-1.5 transition-transform" />
-             </button>
+             {serverMode && !activeProject ? (
+              <button
+                disabled={true}
+                title="Debes crear tu proyecto en la barra lateral izquierda"
+                className="group flex flex-1 w-full justify-center lg:flex-none lg:w-auto items-center gap-3 px-10 py-5 bg-gray-200 dark:bg-zinc-800 text-gray-400 dark:text-zinc-500 font-extrabold uppercase tracking-wide text-xs rounded-2xl shadow-none cursor-not-allowed transition-all"
+              >
+                <Save size={18} />
+                Selecciona tu Proyecto Arriba (Disco)
+              </button>
+             ) : (
+              <button
+                onClick={handleSaveAndContinue}
+                disabled={isSaving || copilotLoading || !currentContent?.trim()}
+                className="group flex flex-1 w-full justify-center lg:flex-none lg:w-auto items-center gap-3 px-10 py-5 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 font-extrabold uppercase tracking-wide text-xs rounded-2xl shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)] transition-all transform hover:-translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                title={!currentContent?.trim() ? "El documento no puede estar vacío" : "Guardar Documento"}
+              >
+                <Save size={18} />
+                {isSaving ? 'Grabando Arquitectura...' : (!currentContent?.trim() ? 'Prohibido Guardar Archivos Vacíos' : 'Validar Documento y Avanzar Fase')}
+                <ArrowRight size={18} className={`transition-transform ${!currentContent?.trim() ? 'opacity-0' : 'group-hover:translate-x-1.5'}`} />
+              </button>
+             )}
           </div>
 
         </div>
