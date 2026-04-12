@@ -1,4 +1,4 @@
-﻿# docs/architecture/data-model.md
+# docs/architecture/data-model.md
 ## Modelo de Datos (Fase 5)
 
 ### Entidades Principales

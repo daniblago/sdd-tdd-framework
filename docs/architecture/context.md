@@ -1,4 +1,4 @@
-﻿# docs/architecture/context.md
+# docs/architecture/context.md
 ## Diagrama de Contexto (C4 Nivel 1)
 
 Este sistema orquesta el desarrollo con IA.

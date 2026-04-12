@@ -1,4 +1,4 @@
-﻿# Spec-001: Núcleo del Framework SDD+TDD
+# Spec-001: Núcleo del Framework SDD+TDD
 
 ## 1. Visión y Objetivos [cite: 77]
 * **Propósito**: Establecer la estructura base que garantice la trazabilidad total desde el negocio hasta el código[cite: 18, 294].

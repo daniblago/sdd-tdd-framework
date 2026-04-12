@@ -1,4 +1,4 @@
-﻿# Glosario y Dominio del Negocio (Fase 2)
+# Glosario y Dominio del Negocio (Fase 2)
 
 ## 1. Términos de Negocio
 * **Término A**: Definición clara y sin ambigüedad. [cite: 63]

@@ -1,4 +1,4 @@
-﻿# docs/rbac-matrix.md
+# docs/rbac-matrix.md
 ## Matriz RBAC: Rol vs Acción vs Recurso [cite: 131, 137]
 
 | Rol | Recurso | Acción (C/R/U/D) | Condición |
