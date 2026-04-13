@@ -1,6 +1,7 @@
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import archiver from 'archiver';
+import jwt from 'jsonwebtoken';
 import { SaveArtifactUseCase } from '../../application/usecases/SaveArtifactUseCase.js';
 import { ReadArtifactUseCase } from '../../application/usecases/ReadArtifactUseCase.js';
 import { LocalFileSystemAdapter } from '../filesystem/LocalFileSystemAdapter.js';
@@ -10,8 +11,8 @@ import * as path from 'path';
 export const workspaceRouter = Router();
 
 const DEFAULT_WORKSPACES_DIR = path.join(process.cwd(), 'workspaces');
+const JWT_SECRET = process.env.JWT_SECRET || 'sdd_super_secret_local_key';
 
-// Ensure base dir exists
 const ensureWorkspacesDir = async () => {
    try { await fs.mkdir(DEFAULT_WORKSPACES_DIR, { recursive: true }); } catch (e) {}
 }
@@ -27,12 +28,37 @@ const getUseCasesForProject = (projectName: string) => {
 };
 
 const SaveArtifactSchema = z.object({
-  projectName: z.string().min(1, 'El projectName es requerido'),
-  relativePath: z.string().min(1, 'El relativePath es requerido'),
+  projectName: z.string().min(1, 'El projectName es requerido').regex(/^[a-zA-Z0-9_-]+$/, 'Hack Prevented: Nombres de proyecto inválidos.'),
+  relativePath: z.string().min(1, 'El relativePath es requerido').refine(val => !val.includes('..'), { message: 'Hack Prevented: Path Traversal detectado.'}),
   content: z.string()
 });
 
-workspaceRouter.get('/projects', async (req: Request, res: Response): Promise<void> => {
+// Middleware JWT
+const authMiddleware = (req: Request, res: Response, next: NextFunction): void => {
+  const authHeader = req.headers.authorization;
+  const token = (authHeader && authHeader.startsWith('Bearer ')) ? authHeader.split(' ')[1] : req.query.token as string;
+  if (!token) {
+     res.status(401).json({ error: 'Falta Token de Acceso' });
+     return;
+  }
+  try {
+     const decoded = jwt.verify(token, JWT_SECRET) as any;
+     (req as any).user = decoded;
+     next();
+  } catch(e) {
+     res.status(401).json({ error: 'Token Inválido o Expirado' });
+  }
+};
+
+const architectOnly = (req: Request, res: Response, next: NextFunction): void => {
+   if ((req as any).user?.role !== 'ARCHITECT') {
+      res.status(403).json({ error: 'OWASP 403: Acción bloqueada. No posees rol ARCHITECT.' });
+      return;
+   }
+   next();
+};
+
+workspaceRouter.get('/projects', authMiddleware, async (req: Request, res: Response): Promise<void> => {
    try {
      const entries = await fs.readdir(DEFAULT_WORKSPACES_DIR, { withFileTypes: true });
      const projects = entries.filter(e => e.isDirectory()).map(e => e.name);
@@ -42,10 +68,11 @@ workspaceRouter.get('/projects', async (req: Request, res: Response): Promise<vo
    }
 });
 
-workspaceRouter.post('/projects', async (req: Request, res: Response): Promise<void> => {
+workspaceRouter.post('/projects', authMiddleware, architectOnly, async (req: Request, res: Response): Promise<void> => {
    try {
      const { projectName } = req.body;
      if (!projectName) { res.status(400).json({ error: 'projectName requerido' }); return; }
+     if (!/^[a-zA-Z0-9_-]+$/.test(projectName)) { res.status(400).json({ error: 'Protección Path Traversal' }); return; }
      const targetPath = path.join(DEFAULT_WORKSPACES_DIR, projectName);
      await fs.mkdir(targetPath, { recursive: true });
      res.status(200).json({ message: 'OK', project: projectName });
@@ -55,10 +82,10 @@ workspaceRouter.post('/projects', async (req: Request, res: Response): Promise<v
 });
 
 // -- Sistema de Sellado (Bóveda) -- //
-workspaceRouter.get('/seal', async (req: Request, res: Response): Promise<void> => {
+workspaceRouter.get('/seal', authMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
      const projectName = req.query.projectName as string;
-     if(!projectName) { res.status(400).json({error: 'projectName faltante'}); return; }
+     if(!projectName || !/^[a-zA-Z0-9_-]+$/.test(projectName)) { res.status(400).json({error: 'projectName faltante o inválido'}); return; }
      const sealPath = path.join(DEFAULT_WORKSPACES_DIR, projectName, '.sdd-sealed');
      try {
         await fs.access(sealPath);
@@ -71,10 +98,10 @@ workspaceRouter.get('/seal', async (req: Request, res: Response): Promise<void> 
   }
 });
 
-workspaceRouter.post('/seal', async (req: Request, res: Response): Promise<void> => {
+workspaceRouter.post('/seal', authMiddleware, architectOnly, async (req: Request, res: Response): Promise<void> => {
   try {
      const { projectName } = req.body;
-     if(!projectName) { res.status(400).json({error: 'projectName faltante'}); return; }
+     if(!projectName || !/^[a-zA-Z0-9_-]+$/.test(projectName)) { res.status(400).json({error: 'projectName faltante o inválido'}); return; }
      const sealPath = path.join(DEFAULT_WORKSPACES_DIR, projectName, '.sdd-sealed');
      await fs.writeFile(sealPath, 'SEALED', 'utf8');
      res.status(200).json({ message: 'Proyecto sellado con éxito' });
@@ -83,19 +110,19 @@ workspaceRouter.post('/seal', async (req: Request, res: Response): Promise<void>
   }
 });
 
-workspaceRouter.delete('/seal/:projectName', async (req: Request, res: Response): Promise<void> => {
+workspaceRouter.delete('/seal/:projectName', authMiddleware, architectOnly, async (req: Request, res: Response): Promise<void> => {
   try {
      const projectName = req.params.projectName as string;
+     if(!projectName || !/^[a-zA-Z0-9_-]+$/.test(projectName)) { res.status(400).json({error: 'projectName faltante o inválido'}); return; }
      const sealPath = path.join(DEFAULT_WORKSPACES_DIR, projectName, '.sdd-sealed');
      await fs.unlink(sealPath);
      res.status(200).json({ message: 'Candado removido' });
   } catch(e) {
-     // Si no existía, está bien (aunque throw). Para no asustar:
      res.status(200).json({ message: 'Candado deshecho (o inexistente)' });
   }
 });
 
-workspaceRouter.post('/artifact', async (req: Request, res: Response): Promise<void> => {
+workspaceRouter.post('/artifact', authMiddleware, architectOnly, async (req: Request, res: Response): Promise<void> => {
   try {
     const parsed = SaveArtifactSchema.parse(req.body);
     const { saveArtifactUseCase } = getUseCasesForProject(parsed.projectName);
@@ -104,7 +131,7 @@ workspaceRouter.post('/artifact', async (req: Request, res: Response): Promise<v
     res.status(200).json({ message: 'Artefacto guardado con éxito' });
   } catch (err: unknown) {
     if (err instanceof z.ZodError) {
-       res.status(400).json({ error: 'Validación fallida', details: err.issues });
+       res.status(400).json({ error: 'Validación fallida LFI interceptado', details: err.issues });
        return;
     }
     const e = err as Error;
@@ -112,9 +139,10 @@ workspaceRouter.post('/artifact', async (req: Request, res: Response): Promise<v
   }
 });
 
-workspaceRouter.get('/download/:projectName', async (req: Request, res: Response): Promise<void> => {
+workspaceRouter.get('/download/:projectName', authMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
      const projectName = req.params.projectName as string;
+     if(!projectName || !/^[a-zA-Z0-9_-]+$/.test(projectName)) { res.status(400).json({error: 'projectName faltante o inválido'}); return; }
      const projectPath = path.join(DEFAULT_WORKSPACES_DIR, projectName);
 
      try {
@@ -127,15 +155,10 @@ workspaceRouter.get('/download/:projectName', async (req: Request, res: Response
      res.setHeader('Content-Type', 'application/zip');
      res.setHeader('Content-Disposition', `attachment; filename=${projectName}-sdd-architecture.zip`);
 
-     const archive = archiver('zip', {
-       zlib: { level: 9 } // Compresión máxima
-     });
+     const archive = archiver('zip', { zlib: { level: 9 } });
 
      archive.on('error', function(err) {
-       console.error("Archive error", err);
-       if (!res.headersSent) {
-         res.status(500).end();
-       }
+       if (!res.headersSent) res.status(500).end();
      });
 
      archive.pipe(res);
@@ -143,13 +166,11 @@ workspaceRouter.get('/download/:projectName', async (req: Request, res: Response
      await archive.finalize();
 
   } catch(e) {
-     if (!res.headersSent) {
-       res.status(500).json({ error: 'Error interno generando ZIP' });
-     }
+     if (!res.headersSent) res.status(500).json({ error: 'Error interno generando ZIP' });
   }
 });
 
-workspaceRouter.get('/artifact', async (req: Request, res: Response): Promise<void> => {
+workspaceRouter.get('/artifact', authMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const relativePath = req.query.relativePath as string;
     const projectName = req.query.projectName as string;
@@ -157,6 +178,8 @@ workspaceRouter.get('/artifact', async (req: Request, res: Response): Promise<vo
       res.status(400).json({ error: 'Faltan parámetros relativePath o projectName' });
       return;
     }
+    if(!/^[a-zA-Z0-9_-]+$/.test(projectName) || relativePath.includes('..')) { res.status(400).json({error: 'Validación LFI fallida'}); return; }
+
     const { readArtifactUseCase } = getUseCasesForProject(projectName);
     const content = await readArtifactUseCase.execute(relativePath);
     if (content === null) {
@@ -169,24 +192,25 @@ workspaceRouter.get('/artifact', async (req: Request, res: Response): Promise<vo
   }
 });
 
-/**
- * Endpoint Proxy para evadir bloqueos de CORS, Firewall y AdBlocks de los navegadores.
- * Despacha de forma segura la llamada al API de Google Gemini vía Node.js nativo (fetch).
- */
 let activeAiModel = 'gemini-1.5-flash';
 
-workspaceRouter.post('/ai-draft', async (req: Request, res: Response): Promise<void> => {
+// AI Status no necesita token
+workspaceRouter.get('/ai-status', async (req: Request, res: Response): Promise<void> => {
+  res.status(200).json({ serverHasKey: !!process.env.GEMINI_API_KEY });
+});
+
+workspaceRouter.post('/ai-draft', authMiddleware, architectOnly, async (req: Request, res: Response): Promise<void> => {
   try {
     const { apiKey, systemPrompt, userPrompt } = req.body;
     
-    if (!apiKey) {
+    const finalApiKey = process.env.GEMINI_API_KEY || apiKey;
+    if (!finalApiKey) {
        res.status(400).json({ error: 'La llave de API de Gemini es obligatoria.' });
        return;
     }
 
-    const cleanedKey = apiKey.trim();
+    const cleanedKey = finalApiKey.trim();
     
-    // Helper funct para llamar generateContent
     const callGenerate = async (model: string) => {
       return await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${cleanedKey}`, {
         method: 'POST',
@@ -199,23 +223,15 @@ workspaceRouter.post('/ai-draft', async (req: Request, res: Response): Promise<v
 
     let response = await callGenerate(activeAiModel);
 
-    // Auto-negociación: Si Google nos bloquea el modelo por región/deprecación (404), listamos los modelos
     if (response.status === 404) {
-      console.log(`[Proxy] El modelo ${activeAiModel} fue averiado (404). Negociando el mejor modelo de reemplazo...`);
       const listReq = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${cleanedKey}`);
-      
       if (listReq.ok) {
          const listData = await listReq.json();
-         const availableModels = listData.models || [];
-         
-         const validFallback = availableModels.find((m: any) => 
-           m.name.includes("gemini") && 
-           m.supportedGenerationMethods?.includes("generateContent")
+         const validFallback = (listData.models || []).find((m: any) => 
+           m.name.includes("gemini") && m.supportedGenerationMethods?.includes("generateContent")
          );
-         
          if (validFallback) {
             activeAiModel = validFallback.name.replace('models/', '');
-            console.log(`[Proxy] Fallback Exitoso. Motor IA actualizado permanentemente a: ${activeAiModel}`);
             response = await callGenerate(activeAiModel);
          }
       }
@@ -223,11 +239,7 @@ workspaceRouter.post('/ai-draft', async (req: Request, res: Response): Promise<v
 
     const textData = await response.text();
     let data;
-    try {
-      data = JSON.parse(textData);
-    } catch(e) {
-      data = { error: { message: "Error in-parseable de Gemini: " + textData.substring(0, 100) } };
-    }
+    try { data = JSON.parse(textData); } catch(e) { data = { error: { message: "Error in-parseable de Gemini: " + textData.substring(0, 100) } }; }
     
     if (!response.ok) {
        res.status(response.status).json(data);
@@ -237,7 +249,6 @@ workspaceRouter.post('/ai-draft', async (req: Request, res: Response): Promise<v
     const outputText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
     res.status(200).json({ text: outputText });
   } catch (err: any) {
-    console.error('[Error en AI Proxy Node]:', err);
     res.status(500).json({ error: 'Fallo fatal en proxy remoto', details: err.message });
   }
 });

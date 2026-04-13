@@ -12,3 +12,6 @@ Thumbs.db
 
 # Persistencia Oculta (Workspaces SDD)
 workspaces/
+
+# Credenciales de Identidad Dinámica (RBAC)
+users.json

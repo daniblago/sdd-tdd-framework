@@ -40,6 +40,7 @@ export default function App() {
   const [serverMode, setServerMode] = useState(false); 
   
   const [apiKey, setApiKey] = useState(() => localStorage.getItem('sdd_api_key') || '');
+  const [serverHasKey, setServerHasKey] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [copilotLoading, setCopilotLoading] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -55,10 +56,28 @@ export default function App() {
 
   const isDevMode = currentUser?.role === 'DEVELOPER';
 
-  // Load Projects on Boot
+  const apiFetch = async (url, options = {}) => {
+    const token = localStorage.getItem('sdd_token');
+    const headers = { ...options.headers };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const res = await fetch(url, { ...options, headers });
+    if (res.status === 401 || res.status === 403) {
+       setCurrentUser(null);
+       localStorage.removeItem('sdd_token');
+       alert('OWASP Shield: Sesión expirada o permisos insuficientes (403/401).');
+       throw new Error('Acceso Denegado');
+    }
+    return res;
+  };
+
   useEffect(() => {
     if (serverMode) {
-      fetch('/api/workspace/projects')
+      apiFetch('/api/workspace/ai-status')
+        .then(res => res.json())
+        .then(data => setServerHasKey(data.serverHasKey))
+        .catch(() => {});
+
+      apiFetch('/api/workspace/projects')
         .then(res => res.json())
         .then(data => {
           if (data.projects) setProjectsList(data.projects);
@@ -82,7 +101,7 @@ export default function App() {
     const sanitized = name.trim().replace(/[^a-z0-9_-]/gi, '-').toLowerCase();
     
     try {
-      const res = await fetch('/api/workspace/projects', {
+      const res = await apiFetch('/api/workspace/projects', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ projectName: sanitized })
@@ -113,7 +132,7 @@ export default function App() {
       if (serverMode && activeProject) {
         // Consultar estado del candado
         try {
-          const sealRes = await fetch(`/api/workspace/seal?projectName=${encodeURIComponent(activeProject)}`);
+          const sealRes = await apiFetch(`/api/workspace/seal?projectName=${encodeURIComponent(activeProject)}`);
           if (sealRes.ok) {
             const sealData = await sealRes.json();
             setIsProjectSealed(sealData.isSealed);
@@ -123,7 +142,7 @@ export default function App() {
         const newVfs = {};
         for (const phase of PHASES) {
           try {
-            const response = await fetch(`/api/workspace/artifact?relativePath=${encodeURIComponent(phase.file)}&projectName=${encodeURIComponent(activeProject)}`);
+            const response = await apiFetch(`/api/workspace/artifact?relativePath=${encodeURIComponent(phase.file)}&projectName=${encodeURIComponent(activeProject)}`);
             if (response.ok) {
               newVfs[phase.file] = await response.text();
             }
@@ -159,7 +178,7 @@ export default function App() {
         return;
       }
       try {
-        await fetch('/api/workspace/artifact', {
+        await apiFetch('/api/workspace/artifact', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ projectName: activeProject, relativePath: activePhase.file, content: currentContent })
@@ -179,7 +198,7 @@ export default function App() {
       // Fase 10 Completada! Sellar proyecto.
       if (serverMode && activeProject) {
         try {
-           await fetch('/api/workspace/seal', { 
+           await apiFetch('/api/workspace/seal', { 
              method: 'POST', 
              headers: {'Content-Type':'application/json'},
              body: JSON.stringify({ projectName: activeProject })
@@ -193,7 +212,7 @@ export default function App() {
   const handleUnlockProject = async () => {
       if (!serverMode || !activeProject) return;
       try {
-         await fetch(`/api/workspace/seal/${encodeURIComponent(activeProject)}`, { method: 'DELETE' });
+         await apiFetch(`/api/workspace/seal/${encodeURIComponent(activeProject)}`, { method: 'DELETE' });
          setIsProjectSealed(false);
       } catch(e) {
          alert("Error abriendo el candado");
@@ -205,7 +224,7 @@ export default function App() {
       alert("❌ El proyecto está protegido bajo Bóveda. Abre el candado en la parte inferior para pedir nuevos borradores.");
       return;
     }
-    if (!apiKey) {
+    if (!serverHasKey && !apiKey) {
       setShowSettings(true);
       return;
     }
@@ -226,7 +245,7 @@ export default function App() {
       const systemPrompt = `Eres el Arquitecto Docente (SpecAgent) IA. Asiste asertivamente en redactar y expandir la fase "${activePhase.title}". Directiva obligatoria: ${getPromptsForPhase(activePhase.id)}`;
       const userPrompt = `Por favor genera el contenido para la fase actual. ${memoryPrompt}\n\nCONTENIDO ACTUAL DE LA FASE ACTIVA (Enriquecer o Autocompletar):\n${currentContent?.trim() ? currentContent : '(vacío, diséñalo interactuando con la memoria)'}\n\nRedacta en formato Markdown profesional y técnico.`;
 
-      const res = await fetch('/api/workspace/ai-draft', {
+      const res = await apiFetch('/api/workspace/ai-draft', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ apiKey, systemPrompt, userPrompt })
@@ -264,6 +283,7 @@ export default function App() {
       });
       const data = await res.json();
       if (res.ok) {
+        localStorage.setItem('sdd_token', data.token);
         setCurrentUser(data.user);
       } else {
         setLoginForm(prev => ({ ...prev, error: data.error || 'Autenticación fallida' }));
@@ -434,9 +454,9 @@ export default function App() {
             >
               <Key size={14}/>
               <span className="flex items-center gap-2">
-                Llave IA
-                {apiKey ? (
-                   <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]" title="Agente Armado y Listo"></span>
+                {serverHasKey ? 'Llave (OWASP)' : 'Llave IA'}
+                {(serverHasKey || apiKey) ? (
+                   <span className={`w-2 h-2 rounded-full ${serverHasKey ? 'bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)] animate-pulse' : 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]'}`} title={serverHasKey ? "Protegido por Variables de Servidor" : "Cargada Localmente"}></span>
                 ) : (
                    <span className="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)] animate-pulse" title="Falta Llave de Autenticación"></span>
                 )}
@@ -466,7 +486,7 @@ export default function App() {
              <button 
                onClick={() => {
                  if(activeProject) {
-                   window.location.href = `/api/workspace/download/${encodeURIComponent(activeProject)}`;
+                   window.location.href = `/api/workspace/download/${encodeURIComponent(activeProject)}?token=${localStorage.getItem('sdd_token')}`;
                  } else {
                    alert("Selecciona un proyecto activo en el disco físico primero.");
                  }
@@ -478,7 +498,7 @@ export default function App() {
              </button>
 
              <button 
-               onClick={() => setCurrentUser(null)}
+               onClick={() => { setCurrentUser(null); localStorage.removeItem('sdd_token'); }}
                className="p-1.5 bg-white dark:bg-[#121215] hover:bg-red-50 dark:hover:bg-red-900/20 text-gray-400 hover:text-red-500 rounded-lg border border-gray-100 dark:border-zinc-800 transition-colors shadow-sm"
                title="Cerrar Sesión"
              >
