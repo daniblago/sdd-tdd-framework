@@ -10,14 +10,19 @@ authRouter.post('/login', async (req: Request, res: Response): Promise<void> => 
     return;
   }
 
-  // Bóveda de usuarios in-memory Hardcodeada
-  if (username === 'admin' && password === 'architect123') {
-    res.status(200).json({ status: 'ok', user: { username: 'admin', role: 'ARCHITECT' } });
+  // Bóveda de usuarios In-Memory respaldada por Variables de Entorno (.env)
+  const ADMIN_USER = process.env.ADMIN_USER || 'admin';
+  const ADMIN_PASS = process.env.ADMIN_PASS || 'architect123';
+  const DEV_USER = process.env.DEV_USER || 'dev';
+  const DEV_PASS = process.env.DEV_PASS || 'dev123';
+
+  if (username === ADMIN_USER && password === ADMIN_PASS) {
+    res.status(200).json({ status: 'ok', user: { username: ADMIN_USER, role: 'ARCHITECT' } });
     return;
   }
 
-  if (username === 'dev' && password === 'dev123') {
-    res.status(200).json({ status: 'ok', user: { username: 'dev', role: 'DEVELOPER' } });
+  if (username === DEV_USER && password === DEV_PASS) {
+    res.status(200).json({ status: 'ok', user: { username: DEV_USER, role: 'DEVELOPER' } });
     return;
   }
 

@@ -6,6 +6,9 @@ coverage/
 dist/
 
 # Archivos de Entorno y Sistema Operativo
-.env
+.env*
 .DS_Store
 Thumbs.db
+
+# Persistencia Oculta (Workspaces SDD)
+workspaces/
