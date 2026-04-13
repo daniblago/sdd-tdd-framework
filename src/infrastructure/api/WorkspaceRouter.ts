@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
+import archiver from 'archiver';
 import { SaveArtifactUseCase } from '../../application/usecases/SaveArtifactUseCase.js';
 import { ReadArtifactUseCase } from '../../application/usecases/ReadArtifactUseCase.js';
 import { LocalFileSystemAdapter } from '../filesystem/LocalFileSystemAdapter.js';
@@ -84,7 +85,7 @@ workspaceRouter.post('/seal', async (req: Request, res: Response): Promise<void>
 
 workspaceRouter.delete('/seal/:projectName', async (req: Request, res: Response): Promise<void> => {
   try {
-     const { projectName } = req.params;
+     const projectName = req.params.projectName as string;
      const sealPath = path.join(DEFAULT_WORKSPACES_DIR, projectName, '.sdd-sealed');
      await fs.unlink(sealPath);
      res.status(200).json({ message: 'Candado removido' });
@@ -99,13 +100,52 @@ workspaceRouter.post('/artifact', async (req: Request, res: Response): Promise<v
     const parsed = SaveArtifactSchema.parse(req.body);
     const { saveArtifactUseCase } = getUseCasesForProject(parsed.projectName);
     await saveArtifactUseCase.execute(parsed.relativePath, parsed.content);
-    res.status(200).json({ message: 'Artefacto guardado', path: parsed.relativePath });
-  } catch (err: any) {
+
+    res.status(200).json({ message: 'Artefacto guardado con éxito' });
+  } catch (err: unknown) {
     if (err instanceof z.ZodError) {
-      res.status(400).json({ error: 'Validación fallida', details: err.issues });
-    } else {
-      res.status(500).json({ error: 'Error interno guardando' });
+       res.status(400).json({ error: 'Validación fallida', details: err.issues });
+       return;
     }
+    const e = err as Error;
+    res.status(500).json({ error: 'Error del servidor', details: e.message });
+  }
+});
+
+workspaceRouter.get('/download/:projectName', async (req: Request, res: Response): Promise<void> => {
+  try {
+     const projectName = req.params.projectName as string;
+     const projectPath = path.join(DEFAULT_WORKSPACES_DIR, projectName);
+
+     try {
+       await fs.access(projectPath);
+     } catch (err) {
+       res.status(404).json({ error: 'Proyecto no encontrado' });
+       return;
+     }
+
+     res.setHeader('Content-Type', 'application/zip');
+     res.setHeader('Content-Disposition', `attachment; filename=${projectName}-sdd-architecture.zip`);
+
+     const archive = archiver('zip', {
+       zlib: { level: 9 } // Compresión máxima
+     });
+
+     archive.on('error', function(err) {
+       console.error("Archive error", err);
+       if (!res.headersSent) {
+         res.status(500).end();
+       }
+     });
+
+     archive.pipe(res);
+     archive.directory(projectPath, false);
+     await archive.finalize();
+
+  } catch(e) {
+     if (!res.headersSent) {
+       res.status(500).json({ error: 'Error interno generando ZIP' });
+     }
   }
 });
 

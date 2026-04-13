@@ -19,7 +19,9 @@ app.get('/', (req, res) => {
 });
 
 // Registro de Rutas
+import { authRouter } from './AuthRouter.js';
 app.use('/api/workspace', workspaceRouter);
+app.use('/api/auth', authRouter);
 
 // Handler genérico de errores
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

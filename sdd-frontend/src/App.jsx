@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { 
   Book, BookOpen, FileText, Layers, Database, 
   ShieldCheck, GitCommit, CheckSquare, ListTodo, 
-  Code, Save, ArrowRight, Sun, Moon, Sparkles, Check, Key, Bot, Settings, HardDrive, Server
+  Code, Save, ArrowRight, Sun, Moon, Sparkles, Check, Key, Bot, Settings, HardDrive, Server,
+  Lock, Shield, User, LogOut, DownloadCloud
 } from 'lucide-react';
 
 const PHASES = [
@@ -47,6 +48,12 @@ export default function App() {
   const [projectsList, setProjectsList] = useState([]);
   const [activeProject, setActiveProject] = useState(() => localStorage.getItem('sdd_active_project') || '');
   const [isProjectSealed, setIsProjectSealed] = useState(false);
+  
+  // Auth State
+  const [currentUser, setCurrentUser] = useState(null);
+  const [loginForm, setLoginForm] = useState({ username: '', password: '', error: '', loading: false });
+
+  const isDevMode = currentUser?.role === 'DEVELOPER';
 
   // Load Projects on Boot
   useEffect(() => {
@@ -246,6 +253,79 @@ export default function App() {
     return text.trim().length > 50;
   };
 
+  const attemptLogin = async (e) => {
+    e.preventDefault();
+    setLoginForm(prev => ({ ...prev, loading: true, error: '' }));
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: loginForm.username, password: loginForm.password })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setCurrentUser(data.user);
+      } else {
+        setLoginForm(prev => ({ ...prev, error: data.error || 'Autenticación fallida' }));
+      }
+    } catch(err) {
+      setLoginForm(prev => ({ ...prev, error: 'Servidor fuera de línea. Inicia "npm run dev"' }));
+    } finally {
+      setLoginForm(prev => ({ ...prev, loading: false }));
+    }
+  };
+
+  if (!currentUser) {
+    return (
+      <div className={`h-screen w-full flex items-center justify-center ${isDarkMode ? 'bg-[#0a0a0c]' : 'bg-[#f4f4f5]'} font-sans`}>
+         <div className={`p-10 rounded-[32px] w-[420px] max-w-[90%] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] border ${isDarkMode ? 'bg-[#121215] border-zinc-800' : 'bg-white border-gray-200'}`}>
+            <div className="flex justify-center mb-6">
+              <div className="bg-indigo-600/10 p-4 rounded-full border border-indigo-500/20">
+                <Lock size={32} className="text-indigo-500" />
+              </div>
+            </div>
+            <h1 className={`text-2xl font-black text-center mb-2 ${isDarkMode ? 'text-white' : 'text-gray-900'} outfit-font tracking-tight`}>Acceso Restringido</h1>
+            <p className={`text-sm text-center mb-8 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Estación de control SDD-TDD Orchestrator</p>
+            
+            {loginForm.error && (
+              <div className="bg-red-500/10 border border-red-500/20 text-red-500 text-xs font-bold p-3 rounded-xl mb-6 flex items-center justify-center gap-2">
+                 <Shield size={14}/> {loginForm.error}
+              </div>
+            )}
+
+            <form onSubmit={attemptLogin} className="flex flex-col gap-4">
+               <div>
+                 <input 
+                   type="text" 
+                   autoFocus
+                   placeholder="Usuario"
+                   value={loginForm.username}
+                   onChange={e => setLoginForm(p => ({...p, username: e.target.value}))}
+                   className={`w-full p-4 rounded-2xl text-sm font-bold border focus:ring-2 focus:ring-indigo-500 transition-all outline-none ${isDarkMode ? 'bg-zinc-900 border-zinc-800 text-white placeholder-zinc-700' : 'bg-gray-50 border-gray-200 text-gray-900 placeholder-gray-400'}`}
+                 />
+               </div>
+               <div>
+                 <input 
+                   type="password" 
+                   placeholder="Contraseña"
+                   value={loginForm.password}
+                   onChange={e => setLoginForm(p => ({...p, password: e.target.value}))}
+                   className={`w-full p-4 rounded-2xl text-sm font-bold border focus:ring-2 focus:ring-indigo-500 transition-all outline-none ${isDarkMode ? 'bg-zinc-900 border-zinc-800 text-white placeholder-zinc-700' : 'bg-gray-50 border-gray-200 text-gray-900 placeholder-gray-400'}`}
+                 />
+               </div>
+               <button 
+                 type="submit" 
+                 disabled={loginForm.loading}
+                 className="mt-4 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-sm py-4 rounded-2xl shadow-lg shadow-indigo-600/20 transition-all flex justify-center items-center gap-2"
+               >
+                 {loginForm.loading ? 'Desencriptando...' : 'Desbloquear Interfaz'} <ArrowRight size={16}/>
+               </button>
+            </form>
+         </div>
+      </div>
+    );
+  }
+
   return (
     <div className={`flex h-screen overflow-hidden bg-gray-50 text-slate-800 dark:bg-[#0c0c0e] dark:text-gray-200 transition-colors duration-300 font-sans`}>
       
@@ -273,14 +353,16 @@ export default function App() {
                 <option value="" disabled>Selecciona...</option>
                 {projectsList.map(p => <option key={p} value={p}>{p}</option>)}
              </select>
-             <button 
-                onClick={handleCreateProject}
-                disabled={!serverMode}
-                className="px-3 py-2 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 font-bold rounded-lg border border-indigo-100 dark:border-indigo-500/20 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 disabled:opacity-50 transition-colors shadow-sm"
-                title="Generar Nuevo Proyecto"
-             >
-                +
-             </button>
+             {!isDevMode && (
+               <button 
+                  onClick={handleCreateProject}
+                  disabled={!serverMode}
+                  className="px-3 py-2 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 font-bold rounded-lg border border-indigo-100 dark:border-indigo-500/20 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 disabled:opacity-50 transition-colors shadow-sm"
+                  title="Generar Nuevo Proyecto"
+               >
+                  +
+               </button>
+             )}
            </div>
            {!serverMode && <p className="text-[10px] text-amber-600 dark:text-amber-500 mt-2 font-medium leading-tight">Activa el Disco Físico (abajo) para habilitar directorios aislados.</p>}
         </div>
@@ -373,7 +455,37 @@ export default function App() {
       </aside>
 
       {/* 2. FLUJO PRINCIPAL WIZARD */}
-      <main className="flex-1 overflow-y-auto w-full">
+      <main className="flex-1 overflow-y-auto w-full relative">
+        {/* Identity Badge & Logout */}
+        <div className="absolute top-6 right-8 flex items-center gap-2 z-10 hidden sm:flex">
+             <div className="px-3 py-1.5 bg-white dark:bg-[#121215] rounded-lg text-[10px] font-bold text-gray-600 dark:text-zinc-400 flex items-center gap-2 shadow-sm border border-gray-100 dark:border-zinc-800">
+                <User size={12} className={isDevMode ? "text-blue-500" : "text-amber-500"} />
+                <span className="uppercase tracking-[0.15em]">{currentUser.role}</span>
+             </div>
+             
+             <button 
+               onClick={() => {
+                 if(activeProject) {
+                   window.location.href = `/api/workspace/download/${encodeURIComponent(activeProject)}`;
+                 } else {
+                   alert("Selecciona un proyecto activo en el disco físico primero.");
+                 }
+               }}
+               className="p-1.5 bg-white dark:bg-[#121215] hover:bg-emerald-50 dark:hover:bg-emerald-900/20 text-gray-400 hover:text-emerald-500 rounded-lg border border-gray-100 dark:border-zinc-800 transition-colors shadow-sm"
+               title="Descargar Arquitectura (.ZIP)"
+             >
+                <DownloadCloud size={14} />
+             </button>
+
+             <button 
+               onClick={() => setCurrentUser(null)}
+               className="p-1.5 bg-white dark:bg-[#121215] hover:bg-red-50 dark:hover:bg-red-900/20 text-gray-400 hover:text-red-500 rounded-lg border border-gray-100 dark:border-zinc-800 transition-colors shadow-sm"
+               title="Cerrar Sesión"
+             >
+                <LogOut size={14} />
+             </button>
+        </div>
+
         <div className="max-w-4xl mx-auto px-10 py-12 pb-32 flex flex-col gap-10">
           
           {/* Componente Hero / Título de Fase */}
@@ -423,14 +535,16 @@ export default function App() {
                </div>
              </div>
 
-             <button 
-                onClick={handleAiAction} 
-                disabled={copilotLoading} 
-                className="z-10 group flex shrink-0 items-center gap-3 text-[13px] font-bold text-white transition-all bg-indigo-600 dark:bg-indigo-600 border border-indigo-700/50 px-6 py-3.5 rounded-xl shadow-[0_4px_15px_-3px_rgba(79,70,229,0.4)] hover:shadow-[0_8px_20px_-3px_rgba(79,70,229,0.5)] hover:bg-indigo-500 hover:-translate-y-0.5 disabled:opacity-50"
-              >
-                {copilotLoading ? <Sparkles size={18} className="animate-spin text-white" /> : <Sparkles size={18} className="group-hover:rotate-12 transition-transform" />}
-                {copilotLoading ? 'Forjando borrador...' : 'Exigir Borrador a IA'}
-             </button>
+             {!isDevMode && (
+               <button 
+                  onClick={handleAiAction} 
+                  disabled={copilotLoading} 
+                  className="z-10 group flex shrink-0 items-center gap-3 text-[13px] font-bold text-white transition-all bg-indigo-600 dark:bg-indigo-600 border border-indigo-700/50 px-6 py-3.5 rounded-xl shadow-[0_4px_15px_-3px_rgba(79,70,229,0.4)] hover:shadow-[0_8px_20px_-3px_rgba(79,70,229,0.5)] hover:bg-indigo-500 hover:-translate-y-0.5 disabled:opacity-50"
+                >
+                  {copilotLoading ? <Sparkles size={18} className="animate-spin text-white" /> : <Sparkles size={18} className="group-hover:rotate-12 transition-transform" />}
+                  {copilotLoading ? 'Forjando borrador...' : 'Exigir Borrador a IA'}
+               </button>
+             )}
              
              {/* Simple bg decoration */}
              <div className="absolute right-0 top-0 w-64 h-64 bg-indigo-600/5 dark:bg-indigo-500/5 rounded-full blur-3xl -z-0"></div>
@@ -449,11 +563,11 @@ export default function App() {
               </div>
               <textarea
                 value={currentContent}
-                onChange={(e) => setCurrentContent(e.target.value)}
-                placeholder={isProjectSealed ? "Este proyecto está protegido bajo Bóveda. Desbloquéalo abajo para continuar editando." : "Digita libremente el contexto aquí..."}
-                className={`w-full h-[450px] bg-transparent text-gray-800 dark:text-gray-200 p-8 font-mono text-[14px] leading-8 resize-y focus:outline-none placeholder:text-gray-300 dark:placeholder:text-zinc-700 ${isProjectSealed ? 'cursor-not-allowed opacity-50' : ''}`}
+                onChange={(e) => !isDevMode && setCurrentContent(e.target.value)}
+                placeholder={isDevMode ? "Modo Desarrollador. Archivo de solo lectura." : isProjectSealed ? "Este proyecto está protegido bajo Bóveda. Desbloquéalo abajo para continuar editando." : "Digita libremente el contexto aquí..."}
+                className={`w-full h-[450px] bg-transparent text-gray-800 dark:text-gray-200 p-8 font-mono text-[14px] leading-8 resize-y focus:outline-none placeholder:text-gray-300 dark:placeholder:text-zinc-700 ${(isProjectSealed || isDevMode) ? 'cursor-not-allowed opacity-50' : ''}`}
                 spellCheck="false"
-                disabled={isProjectSealed}
+                disabled={isProjectSealed || isDevMode}
               />
             </div>
           ) : (
@@ -472,7 +586,12 @@ export default function App() {
 
           {/* Floating Save Action */}
           <div className="sticky bottom-8 flex justify-end">
-             {serverMode && !activeProject ? (
+             {isDevMode ? (
+               <div className="flex flex-1 w-full justify-center lg:flex-none lg:w-auto items-center gap-3 px-10 py-5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-extrabold uppercase tracking-wide text-xs rounded-2xl shadow-lg border border-blue-200 dark:border-blue-800/30">
+                 <Shield size={18} />
+                 Modo Solo Lectura - Acceso Configurado
+               </div>
+             ) : serverMode && !activeProject ? (
               <button
                 disabled={true}
                 title="Debes crear tu proyecto en la barra lateral izquierda"
