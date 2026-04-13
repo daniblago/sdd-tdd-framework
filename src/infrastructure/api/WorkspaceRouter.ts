@@ -196,21 +196,75 @@ let activeAiModel = 'gemini-1.5-flash';
 
 // AI Status no necesita token
 workspaceRouter.get('/ai-status', async (req: Request, res: Response): Promise<void> => {
-  res.status(200).json({ serverHasKey: !!process.env.GEMINI_API_KEY });
+  res.status(200).json({ 
+    serverHasKey: {
+      gemini: !!process.env.GEMINI_API_KEY,
+      openai: !!process.env.OPENAI_API_KEY,
+      anthropic: !!process.env.ANTHROPIC_API_KEY
+    }
+  });
 });
 
 workspaceRouter.post('/ai-draft', authMiddleware, architectOnly, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { apiKey, systemPrompt, userPrompt } = req.body;
+    const { apiKey, provider, systemPrompt, userPrompt } = req.body;
+    const aiProvider = provider || 'gemini';
     
-    const finalApiKey = process.env.GEMINI_API_KEY || apiKey;
+    let envKey = '';
+    if (aiProvider === 'gemini') envKey = process.env.GEMINI_API_KEY || '';
+    if (aiProvider === 'openai') envKey = process.env.OPENAI_API_KEY || '';
+    if (aiProvider === 'anthropic') envKey = process.env.ANTHROPIC_API_KEY || '';
+    
+    const finalApiKey = envKey || apiKey;
     if (!finalApiKey) {
-       res.status(400).json({ error: 'La llave de API de Gemini es obligatoria.' });
+       res.status(400).json({ error: `La llave de API del proveedor ${aiProvider.toUpperCase()} es obligatoria. Verifícala en tu Archivo de Servidor o Bóveda.` });
        return;
     }
 
     const cleanedKey = finalApiKey.trim();
     
+    // --- OPENAI DISPATCHER ---
+    if (aiProvider === 'openai') {
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${cleanedKey}` },
+            body: JSON.stringify({
+                model: 'gpt-4o',
+                messages: [
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: userPrompt }
+                ]
+            })
+        });
+        const data = await response.json();
+        if (!response.ok) { res.status(response.status).json(data); return; }
+        res.status(200).json({ text: data.choices?.[0]?.message?.content || '' });
+        return;
+    }
+
+    // --- ANTHROPIC DISPATCHER ---
+    if (aiProvider === 'anthropic') {
+        const response = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': cleanedKey,
+                'anthropic-version': '2023-06-01'
+            },
+            body: JSON.stringify({
+                model: 'claude-3-5-sonnet-latest', // Resiliente a deprecaciones de fecha
+                max_tokens: 4096,
+                system: systemPrompt,
+                messages: [ { role: 'user', content: userPrompt } ]
+            })
+        });
+        const data = await response.json();
+        if (!response.ok) { res.status(response.status).json(data); return; }
+        res.status(200).json({ text: data.content?.[0]?.text || '' });
+        return;
+    }
+
+    // --- GEMINI DISPATCHER (Default) ---
     const callGenerate = async (model: string) => {
       return await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${cleanedKey}`, {
         method: 'POST',
@@ -249,6 +303,6 @@ workspaceRouter.post('/ai-draft', authMiddleware, architectOnly, async (req: Req
     const outputText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
     res.status(200).json({ text: outputText });
   } catch (err: any) {
-    res.status(500).json({ error: 'Fallo fatal en proxy remoto', details: err.message });
+    res.status(500).json({ error: 'Fallo fatal en proxy remoto inteligente', details: err.message });
   }
 });

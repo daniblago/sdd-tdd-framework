@@ -7,7 +7,7 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "ui": "cd sdd-frontend && npm run dev",
-    "api:dev": "tsx watch src/infrastructure/api/server.ts"
+    "api:dev": "tsx watch --exclude workspaces/**/* --exclude users.json src/infrastructure/api/server.ts"
   },
   "devDependencies": {
     "@types/archiver": "^7.0.0",

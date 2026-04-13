@@ -39,8 +39,9 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [serverMode, setServerMode] = useState(false); 
   
-  const [apiKey, setApiKey] = useState(() => localStorage.getItem('sdd_api_key') || '');
-  const [serverHasKey, setServerHasKey] = useState(false);
+  const [activeProvider, setActiveProvider] = useState(() => localStorage.getItem('sdd_active_provider') || 'gemini');
+  const [apiKeys, setApiKeys] = useState(() => { try { return JSON.parse(localStorage.getItem('sdd_api_keys')) || { gemini: '', openai: '', anthropic: '' }; } catch(e) { return { gemini: '', openai: '', anthropic: '' }; } });
+  const [serverHasKeys, setServerHasKeys] = useState({ gemini: false, openai: false, anthropic: false });
   const [showSettings, setShowSettings] = useState(false);
   const [copilotLoading, setCopilotLoading] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -74,7 +75,7 @@ export default function App() {
     if (serverMode) {
       apiFetch('/api/workspace/ai-status')
         .then(res => res.json())
-        .then(data => setServerHasKey(data.serverHasKey))
+        .then(data => setServerHasKeys(data.serverHasKey || {}))
         .catch(() => {});
 
       apiFetch('/api/workspace/projects')
@@ -224,7 +225,8 @@ export default function App() {
       alert("❌ El proyecto está protegido bajo Bóveda. Abre el candado en la parte inferior para pedir nuevos borradores.");
       return;
     }
-    if (!serverHasKey && !apiKey) {
+    const hasKey = serverHasKeys[activeProvider] || apiKeys[activeProvider];
+    if (!hasKey) {
       setShowSettings(true);
       return;
     }
@@ -248,7 +250,7 @@ export default function App() {
       const res = await apiFetch('/api/workspace/ai-draft', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ apiKey, systemPrompt, userPrompt })
+        body: JSON.stringify({ provider: activeProvider, apiKey: apiKeys[activeProvider], systemPrompt, userPrompt })
       });
       const data = await res.json();
       
@@ -257,7 +259,7 @@ export default function App() {
       } else if (res.ok && !data.text) {
         alert("⚠️ El Agente IA procesó el contexto histórico sin errores de red, pero devolvió un texto vacío.\n\nEsto suele suceder cuando Google Gemini detecta alguna palabra en tu Constitución previa (Phase 1) que activa sus filtros internos de seguridad (Safety Block), obligándolo a censurar la respuesta.\n\nPrueba agregar una frase base tú mismo en este recuadro antes de pulsar el botón.");
       } else {
-        alert(`❌ El Agente IA fue bloqueado por Node.\n\nServidor Gemini devolvió: ${data?.error?.message || 'Token inválido o error de conexión'}.\n\nRevisa tu Llave IA en el Panel Lateral.`);
+        alert(`❌ El Agente IA fue bloqueado por Node.\n\nServidor ${activeProvider.toUpperCase()} devolvió: ${data?.error?.message || 'Token inválido o error de conexión'}.\n\nRevisa tu Llave IA en el Panel Lateral.`);
       }
     } catch(err) {
        console.error("AI fetch exception", err);
@@ -454,9 +456,9 @@ export default function App() {
             >
               <Key size={14}/>
               <span className="flex items-center gap-2">
-                {serverHasKey ? 'Llave (OWASP)' : 'Llave IA'}
-                {(serverHasKey || apiKey) ? (
-                   <span className={`w-2 h-2 rounded-full ${serverHasKey ? 'bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)] animate-pulse' : 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]'}`} title={serverHasKey ? "Protegido por Variables de Servidor" : "Cargada Localmente"}></span>
+                {activeProvider === 'gemini' ? 'Gemini IA' : activeProvider === 'openai' ? 'GPT-4o' : 'Claude 3.5'}
+                {(serverHasKeys[activeProvider] || apiKeys[activeProvider]) ? (
+                   <span className={`w-2 h-2 rounded-full ${serverHasKeys[activeProvider] ? 'bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)] animate-pulse' : 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]'}`} title={serverHasKeys[activeProvider] ? "Protegido por Variables de Servidor" : "Cargada Localmente"}></span>
                 ) : (
                    <span className="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)] animate-pulse" title="Falta Llave de Autenticación"></span>
                 )}
@@ -645,30 +647,43 @@ export default function App() {
         </div>
       </main>
 
-      {/* Settings Modal (Configurar LLave) */}
+      {/* Settings Modal (Configurar LLave Multi-Provider) */}
        {showSettings && (
         <div className="fixed inset-0 bg-gray-900/60 dark:bg-black/80 backdrop-blur-md flex items-center justify-center z-50">
           <div className="bg-white dark:bg-zinc-900 p-8 rounded-3xl border border-gray-200 dark:border-zinc-800 w-[420px] max-w-[90%] shadow-2xl">
             <h3 className="text-2xl font-black mb-1 text-gray-900 dark:text-white flex items-center gap-3 outfit-font">
-              <Key size={22} className="text-indigo-600 dark:text-indigo-400" /> API Bóveda
+              <Key size={22} className="text-indigo-600 dark:text-indigo-400" /> Motor IA
             </h3>
             <p className="text-[13px] text-gray-500 dark:text-gray-400 mb-6 font-medium leading-relaxed">
-              Introduce tu token de Gemini. Reside 100% en el `localStorage` de tu navegador para firmar los fetch calls directos hacia la IA.
+              Selecciona el proveedor y asigna su Token. Estas llaves residen 100% localmente en tu `localStorage` bajo esquemas Zero-Trust.
             </p>
+            
+            <div className="flex bg-gray-100 dark:bg-zinc-950 p-1 rounded-xl mb-4">
+              {['gemini', 'openai', 'anthropic'].map(p => (
+                 <button 
+                    key={p}
+                    onClick={() => { setActiveProvider(p); localStorage.setItem('sdd_active_provider', p); }}
+                    className={`flex-1 py-2 text-xs font-bold uppercase tracking-wider rounded-lg transition-colors ${activeProvider === p ? 'bg-white dark:bg-zinc-800 shadow-sm text-indigo-600 dark:text-indigo-400' : 'text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'}`}
+                 >
+                    {p}
+                 </button>
+              ))}
+            </div>
+
             <input 
               type="password" 
-              value={apiKey}
-              onChange={e => setApiKey(e.target.value)}
-              placeholder="Ej: AIzaSyBgHw9m..."
+              value={apiKeys[activeProvider] || ''}
+              onChange={e => setApiKeys(prev => ({ ...prev, [activeProvider]: e.target.value }))}
+              placeholder={`Llave de ${activeProvider.toUpperCase()}...`}
               className="w-full bg-gray-50 dark:bg-zinc-950 border border-gray-200 dark:border-zinc-800 text-gray-900 dark:text-white rounded-xl p-4 mb-6 text-[14px] font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
             <div className="flex justify-end gap-3">
               <button onClick={() => setShowSettings(false)} className="px-5 py-2.5 text-xs font-bold uppercase tracking-wider text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors">Abortar</button>
               <button 
-                onClick={() => { localStorage.setItem('sdd_api_key', apiKey); setShowSettings(false); }} 
+                onClick={() => { localStorage.setItem('sdd_api_keys', JSON.stringify(apiKeys)); setShowSettings(false); }} 
                 className="px-6 py-2.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-xs font-bold uppercase tracking-wider rounded-xl hover:shadow-lg transition-all hover:-translate-y-0.5"
               >
-                Inyectar Token
+                Guardar Motor
               </button>
             </div>
           </div>
