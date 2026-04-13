@@ -38,8 +38,8 @@ El `[ResidentAPP]` adoptará un enfoque de persistencia políglota para optimiza
 
 *   **Tecnología:** `PostgreSQL`.
 *   **Propósito:** Almacenar todos los datos transaccionales y estructurados del `[ResidentAPP]`, incluyendo información de `Residentes`, `Unidades Privadas`, `Expensas Comunes`, `Cuotas Extraordinarias`, `Movimientos Financieros`, `Amenidades`, `Reservas`, `PQRS`, `Circulares / Comunicados` y datos de configuración del sistema.
-*   **Justificación:** `PostgreSQL` ofrece robustez, madurez, capacidades ACID, un ecosistema rico para `ORM` (como JPA/Entity Framework) y alta `Confiabilidad` para la integridad de datos críticos. Su soporte para JSONB también proporciona flexibilidad para datos semi-estructurados si fuera necesario en el futuro, sin comprometer la estructura relacional principal.
-*   **Patrón de Acceso:** Se utilizará un `ORM` para mapear las `Entidades de Dominio` a la base de datos relacional, lo que simplifica la interacción y mantiene la `Mantenibilidad` del código de acceso a datos.
+*   **Justificación:** `PostgreSQL` ofrece robustez, madurez, capacidades ACID, un ecosistema rico para `ORM` (como `Prisma`) y alta `Confiabilidad` para la integridad de datos críticos. Su soporte para JSONB también proporciona flexibilidad para datos semi-estructurados si fuera necesario en el futuro, sin comprometer la estructura relacional principal.
+*   **Patrón de Acceso:** Se utilizará `Prisma ORM` para mapear las `Entidades de Dominio` a la base de datos relacional, lo que simplifica la interacción con type-safety completo y mantiene la `Mantenibilidad` del código de acceso a datos.
 
 ### 3.2. Almacén de Documentos (No Relacional / Objetos)
 
@@ -57,7 +57,7 @@ El `[ResidentAPP]` adoptará un enfoque de persistencia políglota para optimiza
 
 ## 4. Modelo de Datos Lógico (Entidades de Dominio)
 
-Las `Entidades` son el corazón de la `Arquitectura Limpia` y representan las `reglas de negocio` del `[ResidentAPP]`. Son clases puras de dominio (POJOs/POCOs) que encapsulan datos y comportamiento, y son completamente agnósticas a los detalles de persistencia. El modelo de datos lógico se deriva directamente de estas `Entidades` y sus relaciones.
+Las `Entidades` son el corazón de la `Arquitectura Limpia` y representan las `reglas de negocio` del `[ResidentAPP]`. Son clases puras de dominio TypeScript que encapsulan datos y comportamiento, y son completamente agnósticas a los detalles de persistencia. El modelo de datos lógico se deriva directamente de estas `Entidades` y sus relaciones.
 
 A continuación, se presentan las `Entidades` principales, basadas en el `Glosario` y la `Especificación Funcional`, que formarán la base de nuestro esquema de persistencia:
 
@@ -98,7 +98,7 @@ A continuación, se presentan las `Entidades` principales, basadas en el `Glosar
 
 **Consideraciones para el Modelo:**
 *   **Identificadores:** Se utilizarán UUIDs (Universally Unique Identifiers) como claves primarias para la mayoría de las `Entidades` para facilitar la `Escalabilidad` y la distribución en un entorno `Cloud-Native` (evitando dependencias en secuencias autoincrementales).
-*   **Tipos de Datos:** Uso de tipos de datos adecuados para garantizar la integridad (ej. `BigDecimal` para valores monetarios para evitar problemas de precisión en `MovimientoFinanciero`).
+*   **Tipos de Datos:** Uso de tipos de datos adecuados para garantizar la integridad (ej. `Decimal.js` para valores monetarios para evitar problemas de precisión de punto flotante en `MovimientoFinanciero`).
 *   **Normalización:** El modelo buscará un equilibrio entre la normalización (para reducir la redundancia y mejorar la integridad de los datos) y la desnormalización estratégica (para optimizar el `Rendimiento` de consultas específicas, si fuera necesario en el futuro, pero siempre manteniendo el origen de la verdad normalizado).
 
 ## 5. Interacción de Datos y Gestión de Dependencias
@@ -109,25 +109,25 @@ La interacción con los datos se gestionará a través de la `Regla de la Depend
 
 En la `Capa de Casos de Uso`, se definirán interfaces (Puertos) que especifican las operaciones de persistencia que necesitan las `reglas de negocio`. Por ejemplo:
 
-```java
+```typescript
 // Definido en la capa de Casos de Uso
-public interface EstadoDeCuentaRepositoryPort {
-    EstadoDeCuenta findByUnidadPrivadaIdAndPeriodo(UUID unidadPrivadaId, String periodo);
-    List<EstadoDeCuenta> findByResidenteId(UUID residenteId);
-    void save(EstadoDeCuenta estadoDeCuenta);
-    // Otros métodos de persistencia...
+export interface EstadoDeCuentaRepositoryPort {
+  findByUnidadPrivadaIdAndPeriodo(unidadPrivadaId: string, periodo: string): Promise<EstadoDeCuenta | null>;
+  findByResidenteId(residenteId: string): Promise<EstadoDeCuenta[]>;
+  save(estadoDeCuenta: EstadoDeCuenta): Promise<void>;
+  // Otros métodos de persistencia...
 }
 
-public interface ResidenteRepositoryPort {
-    Residente findById(UUID residenteId);
-    List<UnidadPrivada> findUnidadesAsociadasByResidenteId(UUID residenteId);
-    // Otros métodos de persistencia...
+export interface ResidenteRepositoryPort {
+  findById(residenteId: string): Promise<Residente | null>;
+  findUnidadesAsociadasByResidenteId(residenteId: string): Promise<UnidadPrivada[]>;
+  // Otros métodos de persistencia...
 }
 
-public interface DocumentStoragePort {
-    String uploadDocument(String folder, String fileName, byte[] content, String contentType);
-    byte[] downloadDocument(String documentUrl);
-    // Otros métodos de gestión de documentos...
+export interface DocumentStoragePort {
+  uploadDocument(folder: string, fileName: string, content: Buffer, contentType: string): Promise<string>;
+  downloadDocument(documentUrl: string): Promise<Buffer>;
+  // Otros métodos de gestión de documentos...
 }
 ```
 
@@ -135,25 +135,28 @@ public interface DocumentStoragePort {
 
 Las implementaciones concretas de estos `Puertos` residirán en la `Capa de Adaptadores de Interfaz` o `Frameworks y Drivers`. Estas implementaciones serán responsables de interactuar con la tecnología de persistencia subyacente (PostgreSQL vía ORM, S3/Blob Storage vía SDK).
 
-```java
+```typescript
 // Implementado en la capa de Frameworks y Drivers
-@Repository
-public class PostgresEstadoDeCuentaRepositoryAdapter implements EstadoDeCuentaRepositoryPort {
-    // Inyección de Dependencias del EntityManager o JpaRepository
-    // Conversión entre Entidades de Dominio y Modelos de Persistencia (si son diferentes)
-    // Lógica para interactuar con PostgreSQL
+import { Injectable } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+
+@Injectable()
+export class PrismaEstadoDeCuentaRepositoryAdapter implements EstadoDeCuentaRepositoryPort {
+  constructor(private readonly prisma: PrismaService) {}
+  // Conversión entre Entidades de Dominio y Modelos de Persistencia (Prisma models)
+  // Lógica para interactuar con PostgreSQL vía Prisma
 }
 
-@Repository
-public class S3DocumentStorageAdapter implements DocumentStoragePort {
-    // Inyección de Dependencias del cliente S3
-    // Lógica para interactuar con Amazon S3
+@Injectable()
+export class S3DocumentStorageAdapter implements DocumentStoragePort {
+  constructor(private readonly s3Client: S3Client) {}
+  // Lógica para interactuar con Amazon S3 vía AWS SDK v3
 }
 ```
 
 ### 5.3. Mapeo entre Dominio y Persistencia (DTOs/Mappers)
 
-Cuando sea necesario, se utilizarán `DTOs` o clases de modelo específicas para la persistencia (ej. `JPA Entities`, `ORM Models`) que pueden no ser idénticas a las `Entidades de Dominio`. `Serializadores/Mappers` (por ejemplo, con herramientas como MapStruct o a mano) en la `Capa de Adaptadores de Interfaz` serán responsables de la conversión bidireccional entre `Entidades de Dominio` y estos modelos de persistencia, garantizando que el dominio permanezca limpio e independiente.
+Cuando sea necesario, se utilizarán `DTOs` o tipos de modelo específicos para la persistencia (ej. tipos generados por `Prisma`) que pueden no ser idénticos a las `Entidades de Dominio`. `Mappers` (funciones de transformación o clases dedicadas con `class-transformer`) en la `Capa de Adaptadores de Interfaz` serán responsables de la conversión bidireccional entre `Entidades de Dominio` y estos modelos de persistencia, garantizando que el dominio permanezca limpio e independiente.
 
 ## 6. Consideraciones de Atributos de Calidad en el Contexto de Datos
 
@@ -182,7 +185,7 @@ Los `Atributos de Calidad` definidos en la `Constitución de Arquitectura` se ap
 *   **Consistencia de Datos:** Asegurar la consistencia de datos a través de transacciones y, si se usa replicación asíncrona, entender las implicaciones de la consistencia eventual.
 
 ### 6.5. Mantenibilidad
-*   **Migraciones de Esquema:** Utilización de herramientas de migración de esquema de base de datos (ej. Flyway, Liquibase) para gestionar de forma versionada y automatizada la evolución del esquema de `PostgreSQL`.
+*   **Migraciones de Esquema:** Utilización de `Prisma Migrate` para gestionar de forma versionada y automatizada la evolución del esquema de `PostgreSQL`. Las migraciones se generan a partir del `schema.prisma` declarativo y se versionan junto al código fuente.
 *   **Código Limpio en Repositorios:** Aplicación de `Código Limpio` y convenciones de nombramiento en las implementaciones de repositorios para facilitar la lectura y el mantenimiento.
 *   **Documentación de Esquemas:** Mantener una documentación actualizada del esquema de la base de datos, complementaria a esta fase.
 

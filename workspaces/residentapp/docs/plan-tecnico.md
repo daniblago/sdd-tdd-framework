@@ -39,22 +39,22 @@ Se ha optado por un stack `Cloud-Native` robusto, ampliamente adoptado en la ind
 
 ### 3.1. Backend (ResidentAPP API, Servicio de Reporting)
 
-*   **Lenguaje de Programación:** `Java 17+`
-    *   **Justificación:** Estabilidad, rendimiento, ecosistema maduro, fuerte tipado, herramientas de análisis estático, y excelente soporte para patrones de diseño avanzados como `Inyección de Dependencias` y `Arquitectura Limpia`.
-*   **Framework Principal:** `Spring Boot 3.x`
-    *   **Justificación:** Facilita la creación de aplicaciones `stand-alone` y `Cloud-Native` con configuración mínima. Su potente contenedor de `DI` (`Spring IoC`) es crucial para implementar el `DIP` y la `Inyección de Dependencias` de forma efectiva. Proporciona módulos para `Web` (`Spring Web`), `Datos` (`Spring Data JPA`), `Seguridad` (`Spring Security`) y `Manejo de Mensajes`.
-*   **ORM:** `Spring Data JPA` con `Hibernate`
-    *   **Justificación:** Abstracción del acceso a la base de datos relacional, facilitando el mapeo de `Entidades de Dominio` a la persistencia. Permite a los `Casos de Uso` interactuar con `Puertos` de repositorio agnósticos a la base de datos, mientras los `Adaptadores` se encargan de la interacción `ORM-DB`.
-*   **Servicios de Seguridad:** `Spring Security`
-    *   **Justificación:** Framework de seguridad líder en Java, proporciona `Autenticación` (`OAuth 2.0`, `JWT` validation) y `Autorización` (`RBAC` y `ABAC light`) robustas. Permite configurar filtros de seguridad y proteger `endpoints` de forma granular.
-*   **Generación de `JWT`:** `jjwt` (Java JWT) o funcionalidades integradas de `Spring Security OAuth2`.
-    *   **Justificación:** Implementación estándar y segura para la creación y validación de `JSON Web Tokens`.
-*   **API Documentation:** `SpringDoc OpenAPI` (compatible con Swagger UI)
-    *   **Justificación:** Generación automática de documentación de `API RESTful` (`OpenAPI/Swagger`) a partir del código, esencial para la `Mantenibilidad` y para que los `Frontends` puedan consumir la API eficientemente.
-*   **Comunicación Interna entre Microservicios (Ej. API con Reporting Service):** `gRPC`
-    *   **Justificación:** Protocolo de `RPC` de alto rendimiento para comunicación síncrona, ideal para microservicios, basado en `HTTP/2` y `Protocol Buffers`. Mejora el `Rendimiento` y la `eficiencia` en la comunicación entre servicios.
-*   **Manejo de Errores/Validación:** `Spring Validation` (Jakarta Bean Validation)
-    *   **Justificación:** Estándar para la validación de objetos Java, utilizado en `Adaptadores de Interfaz` (Controllers) para validar `DTOs` de entrada.
+*   **Lenguaje de Programación:** `TypeScript 5.x` sobre `Node.js 20+`
+    *   **Justificación:** Tipado estático robusto, ecosistema maduro, lenguaje compartido con el `frontend` (full-stack TypeScript), excelente soporte para patrones de diseño avanzados como `Inyección de Dependencias` y `Arquitectura Limpia`. Permite reutilizar interfaces y tipos entre capas.
+*   **Framework Principal:** `NestJS 10.x`
+    *   **Justificación:** Framework progresivo para `Node.js` que facilita la creación de aplicaciones `stand-alone` y `Cloud-Native` con una arquitectura modular. Su potente contenedor de `DI` nativo es crucial para implementar el `DIP` y la `Inyección de Dependencias` de forma efectiva. Proporciona módulos para `Web` (`@nestjs/platform-express` o `@nestjs/platform-fastify`), `Datos` (integración con ORMs), `Seguridad` (`@nestjs/passport`, `@nestjs/jwt`) y `Manejo de Mensajes` (`@nestjs/microservices`). Su estructura de módulos, controladores, servicios y providers se alinea naturalmente con la `Arquitectura Limpia`.
+*   **ORM:** `Prisma ORM`
+    *   **Justificación:** ORM moderno con generación de tipos TypeScript automática a partir del esquema, migraciones declarativas, y excelente experiencia de desarrollo. Facilita el mapeo de `Entidades de Dominio` a la persistencia manteniendo type-safety end-to-end. Permite a los `Casos de Uso` interactuar con `Puertos` de repositorio agnósticos a la base de datos, mientras los `Adaptadores` se encargan de la interacción `ORM-DB`.
+*   **Servicios de Seguridad:** `Passport.js` con `@nestjs/passport` y `@nestjs/jwt`
+    *   **Justificación:** Estrategia de autenticación modular y extensible, líder en el ecosistema `Node.js`. Proporciona `Autenticación` (`OAuth 2.0`, `JWT` validation) y combinada con `Guards` de `NestJS` permite implementar `Autorización` (`RBAC` y `ABAC light`) robustas. Permite configurar estrategias de seguridad y proteger `endpoints` de forma granular mediante decoradores.
+*   **Generación de `JWT`:** `@nestjs/jwt` (basado en `jsonwebtoken`).
+    *   **Justificación:** Implementación estándar y segura para la creación y validación de `JSON Web Tokens`, integrada nativamente con el ecosistema `NestJS`.
+*   **API Documentation:** `@nestjs/swagger` (compatible con Swagger UI)
+    *   **Justificación:** Generación automática de documentación de `API RESTful` (`OpenAPI/Swagger`) a partir de decoradores en el código, esencial para la `Mantenibilidad` y para que los `Frontends` puedan consumir la API eficientemente.
+*   **Comunicación Interna entre Microservicios (Ej. API con Reporting Service):** `tRPC` o `@nestjs/microservices`
+    *   **Justificación:** `tRPC` permite comunicación end-to-end type-safe entre servicios TypeScript sin necesidad de generar código. Alternativamente, `@nestjs/microservices` soporta múltiples transportes (`TCP`, `Redis`, `NATS`, `gRPC`) para comunicación entre microservicios, ofreciendo flexibilidad. Mejora el `Rendimiento` y la `eficiencia` en la comunicación entre servicios.
+*   **Manejo de Errores/Validación:** `class-validator` y `class-transformer`
+    *   **Justificación:** Estándar en el ecosistema `NestJS` para la validación de objetos TypeScript mediante decoradores, utilizado en `Adaptadores de Interfaz` (Controllers) para validar `DTOs` de entrada. Integrado con el `ValidationPipe` de `NestJS` para validación automática.
 
 ### 3.2. Frontend Web (ResidentAPP Web Portal - Admin/Revisor)
 
@@ -92,7 +92,7 @@ Se ha optado por un stack `Cloud-Native` robusto, ampliamente adoptado en la ind
 
 *   **Tecnología:** `Amazon S3` (Simple Storage Service)
     *   **Justificación:** Conforme a Fase 5. Almacenamiento de objetos altamente `escalable`, `duradero` y de bajo costo. Ideal para `RNC`s, actas, `comunicados` en PDF, imágenes y reportes generados. Su `SDK` de Java y JavaScript/TypeScript es maduro.
-*   **SDK:** `AWS SDK for Java` / `AWS SDK for JavaScript v3`.
+*   **SDK:** `AWS SDK for JavaScript v3` (`@aws-sdk/client-s3`, `@aws-sdk/client-sns`, `@aws-sdk/client-ses`).
 
 ### 3.6. Estrategia de Caching
 
@@ -104,7 +104,7 @@ Se ha optado por un stack `Cloud-Native` robusto, ampliamente adoptado en la ind
 
 *   **Tecnología:** `Amazon Simple Notification Service (SNS)` / `Amazon Simple Email Service (SES)`
     *   **Justificación:** `SNS` para `notificaciones push` a dispositivos móviles (a través de `Firebase Cloud Messaging` o `Apple Push Notification Service`) y `SMS`. `SES` para el envío de correos electrónicos transaccionales (`PQRS`, `reservas`, `circulares`). Servicios gestionados que garantizan `escalabilidad` y `confiabilidad`.
-*   **SDK:** `AWS SDK for Java` / `AWS SDK for JavaScript v3`.
+*   **SDK:** `AWS SDK for JavaScript v3` (`@aws-sdk/client-s3`, `@aws-sdk/client-sns`, `@aws-sdk/client-ses`).
 
 ### 3.8. Pasarela de Pagos
 
@@ -116,26 +116,24 @@ Se ha optado por un stack `Cloud-Native` robusto, ampliamente adoptado en la ind
 La estandarización de herramientas asegura la consistencia, la `mantenibilidad` y la eficiencia del equipo.
 
 *   **IDE (Integrated Development Environment):**
-    *   **Backend:** `IntelliJ IDEA Ultimate` (preferido) o `VS Code`.
-    *   **Frontend:** `VS Code`.
-    *   **Justificación:** Herramientas maduras con excelente soporte para `Java`, `TypeScript`, `React`, `Spring Boot`, `Docker`, y `Git`.
+    *   **Backend y Frontend:** `VS Code` (preferido) o `WebStorm`.
+    *   **Justificación:** Herramientas maduras con excelente soporte nativo para `TypeScript`, `NestJS`, `React`, `React Native`, `Prisma`, `Docker`, y `Git`. `VS Code` unifica el entorno de desarrollo full-stack TypeScript.
 *   **Control de Versiones:** `Git`
     *   **Plataforma:** `GitHub Enterprise`
     *   **Justificación:** Estándar de la industria para la colaboración en equipo, trazabilidad del código y `Gestión de Dependencias` entre ramas.
 *   **Build Automation Tools:**
-    *   **Backend:** `Gradle` (alternativa: `Maven`).
-    *   **Frontend:** `npm` / `Yarn`.
-    *   **Justificación:** Automatización de la compilación, gestión de dependencias y empaquetado del código. `Gradle` ofrece flexibilidad con `Groovy/Kotlin DSL`.
+    *   **Backend y Frontend:** `npm` o `pnpm` (preferido por rendimiento y eficiencia de espacio en disco).
+    *   **Justificación:** Gestión unificada de dependencias y scripts para todo el stack TypeScript. `pnpm` ofrece instalaciones más rápidas, ahorro de espacio en disco mediante links simbólicos, y soporte nativo para monorepos con `workspaces`.
 *   **Test Frameworks & Libraries:**
-    *   **Backend (Java):** `JUnit 5` (unitarias), `Mockito` (mocks), `Spring Boot Test` (integración), `Testcontainers` (integración con DB real).
-    *   **Frontend (React/React Native):** `Jest` (unitarias), `React Testing Library` (componentes), `Cypress` (E2E).
-    *   **Justificación:** Proporcionan un ecosistema completo para implementar el `Desarrollo Guiado por Pruebas (TDD)` en todas las capas, desde `Pruebas Unitarias` para `Entidades` y `Casos de Uso` hasta `Pruebas de Aceptación/E2E` para los `Flujos` completos.
-*   **Static Code Analysis:** `SonarQube` / `PMD` / `ESLint` / `Prettier`
-    *   **Justificación:** Asegurar la calidad del `Código Limpio`, identificar problemas de seguridad, bugs y `deuda técnica` temprana. `Prettier` para formato de código consistente.
+    *   **Backend (NestJS):** `Vitest` (unitarias, más rápido que Jest y con soporte nativo de TypeScript/ESM), mocks nativos de `Vitest` (`vi.fn()`, `vi.mock()`), `@nestjs/testing` (integración), `Testcontainers` para Node.js (integración con DB real).
+    *   **Frontend (React/React Native):** `Vitest` (unitarias), `React Testing Library` (componentes), `Cypress` o `Playwright` (E2E).
+    *   **Justificación:** `Vitest` unifica el framework de pruebas para todo el stack TypeScript, proporcionando un ecosistema completo para implementar el `Desarrollo Guiado por Pruebas (TDD)` en todas las capas, desde `Pruebas Unitarias` para `Entidades` y `Casos de Uso` hasta `Pruebas de Aceptación/E2E` para los `Flujos` completos. Su compatibilidad con la API de Jest facilita la migración.
+*   **Static Code Analysis:** `ESLint` (con `@typescript-eslint`) / `Prettier` / `SonarQube` (opcional)
+    *   **Justificación:** `ESLint` con reglas de TypeScript asegura la calidad del `Código Limpio`, identifica problemas de seguridad, bugs y `deuda técnica` temprana. `Prettier` para formato de código consistente. `SonarQube` como capa adicional opcional para análisis de seguridad y complejidad.
 *   **Docker:** `Docker Desktop`
     *   **Justificación:** Contenerización de aplicaciones para desarrollo local consistente y empaquetado para `despliegue` en `Kubernetes`.
-*   **Gestión de Dependencias (Backend):** `Spring Dependency Management` (con `Gradle`)
-    *   **Justificación:** Simplifica la gestión de versiones de librerías y dependencias transitivas.
+*   **Gestión de Dependencias:** `pnpm` con `workspaces` (monorepo)
+    *   **Justificación:** Simplifica la gestión de versiones de librerías y dependencias transitivas. Permite compartir tipos e interfaces entre backend y frontend en un monorepo TypeScript.
 
 ## 5. Estrategia de Despliegue y Entornos
 
@@ -156,7 +154,7 @@ La estrategia se centrará en un modelo `Cloud-Native` que maximiza la `Escalabi
 ### 5.3. Contenerización y Orquestación
 
 *   **Contenerización:** `Docker`
-    *   **Justificación:** Empaquetar el `backend` (Spring Boot API, Reporting Service) y otros componentes en contenedores portables y aislados, facilitando el `despliegue` y la `escalabilidad`.
+    *   **Justificación:** Empaquetar el `backend` (NestJS API, Reporting Service) y otros componentes en contenedores portables y aislados, facilitando el `despliegue` y la `escalabilidad`.
 *   **Orquestación:** `Amazon Elastic Kubernetes Service (EKS)`
     *   **Justificación:** Servicio gestionado de `Kubernetes` en `AWS`. Proporciona `escalabilidad` elástica, `alta disponibilidad`, auto-recuperación y gestión de la carga de trabajo para los contenedores, crucial para la `resiliencia` y el `rendimiento` bajo demanda.
 *   **Registro de Contenedores:** `Amazon Elastic Container Registry (ECR)`
@@ -166,7 +164,7 @@ La estrategia se centrará en un modelo `Cloud-Native` que maximiza la `Escalabi
 
 *   **Herramienta:** `GitHub Actions` (o `GitLab CI/CD` si el repositorio es `GitLab`)
     *   **Justificación:** Automatiza los pasos del `CI/CD`.
-        *   **CI:** Compilación de código, ejecución de `pruebas unitarias`, `pruebas de integración` (usando `Testcontainers`), análisis estático de código (`SonarQube`), y construcción de imágenes `Docker`.
+        *   **CI:** Compilación y verificación de tipos TypeScript, ejecución de `pruebas unitarias`, `pruebas de integración` (usando `Testcontainers`), análisis estático de código (`ESLint`, `SonarQube` opcional), y construcción de imágenes `Docker`.
         *   **CD:** `Despliegue` automatizado a los entornos `DEV`, `QA`, `Staging` y `Producción` (con aprobación manual para `Staging`/`PROD`) en `EKS`.
     *   **Beneficios:** Reducción de errores manuales, mayor frecuencia de `despliegue`, `retroalimentación` rápida a los desarrolladores, y mejora de la `confiabilidad` del proceso de entrega.
 
@@ -191,10 +189,10 @@ Para garantizar la `Confiabilidad`, `Rendimiento` y `Mantenibilidad`, se impleme
 Más allá de las herramientas, la adhesión a las prácticas de ingeniería es fundamental.
 
 *   **`TDD` Estricto:** Es un mandato. Cada nueva `funcionalidad` o `corrección de error` debe comenzar con una prueba fallida. `Pruebas Unitarias` para `Entidades` y `Casos de Uso` al 100%. `Pruebas de Integración` y `E2E` para `Adaptadores` y flujos completos.
-*   **`Inyección de Dependencias (DI)`:** Uso consistente del contenedor `Spring IoC` para gestionar las dependencias, garantizando el `DIP` y la `Testabilidad`.
-*   **`Código Limpio` y Estándares:** Adherencia estricta a las guías de `Código Limpio` (Robert C. Martin), estándares de codificación de `Java` y `TypeScript`, y uso de `linters` (`ESLint`) y `formatters` (`Prettier`) automatizados.
+*   **`Inyección de Dependencias (DI)`:** Uso consistente del contenedor de `DI` nativo de `NestJS` para gestionar las dependencias, garantizando el `DIP` y la `Testabilidad`.
+*   **`Código Limpio` y Estándares:** Adherencia estricta a las guías de `Código Limpio` (Robert C. Martin), estándares de codificación de `TypeScript`, y uso de `linters` (`ESLint` con `@typescript-eslint`) y `formatters` (`Prettier`) automatizados.
 *   **Manejo de Errores Consistente:** Implementar una estrategia uniforme para el `manejo de excepciones` en todas las capas, proporcionando mensajes de error significativos sin exponer detalles internos, y registrando adecuadamente.
-*   **Seguridad por Diseño:** Integrar las consideraciones de `Roles y Acceso` (Fase 6) en cada etapa de diseño e implementación. Uso de librerías de seguridad robustas (`Spring Security`), `cifrado` de datos en tránsito y en reposo, y análisis de vulnerabilidades (`SAST`/`DAST` en CI/CD).
+*   **Seguridad por Diseño:** Integrar las consideraciones de `Roles y Acceso` (Fase 6) en cada etapa de diseño e implementación. Uso de librerías de seguridad robustas (`Passport.js`, `@nestjs/jwt`, `Guards` de NestJS), `cifrado` de datos en tránsito y en reposo, y análisis de vulnerabilidades (`SAST`/`DAST` en CI/CD).
 *   **`API RESTful` Guidelines:** Diseño de `APIs` coherentes, versionadas, con uso apropiado de verbos `HTTP` y códigos de estado, siguiendo los principios de `REST`.
 *   **Patrones de Diseño:** Aplicación consciente de patrones de diseño (ej. `Factory`, `Builder`, `Strategy`) para mejorar la `Flexibilidad` y `Mantenibilidad`.
 
@@ -202,16 +200,16 @@ Más allá de las herramientas, la adhesión a las prácticas de ingeniería es 
 
 Las elecciones tecnológicas de este `Blueprint TS` están directamente orientadas a la consecución de los `Atributos de Calidad` del `[ResidentAPP]`:
 
-*   **Testabilidad:** `JUnit`, `Mockito`, `Spring Boot Test`, `Testcontainers`, `Jest`, `React Testing Library`, `Cypress`, junto con la `DI` y la `Arquitectura Limpia`, garantizan una `testeabilidad` profunda.
-*   **Mantenibilidad:** `TypeScript`, `Java 17+`, `Spring Boot`, `React`, `React Native`, `Clean Code`, `SonarQube`, `Prettier`, `Gradle`/`npm`, `GitHub Enterprise` y `IaC` contribuyen a un código y una infraestructura fáciles de entender, modificar y evolucionar.
-*   **Flexibilidad/Adaptabilidad:** La `Arquitectura Limpia` desacopla el `dominio` de la tecnología. `Spring Boot` y `React` ofrecen un ecosistema rico para futuras expansiones. `Kubernetes` y `Terraform` facilitan la adaptación a cambios de infraestructura o crecimiento.
-*   **Rendimiento:** `Java` y `Spring Boot` ofrecen alto rendimiento. `PostgreSQL` y `Redis` (con `ElastiCache`) son soluciones de datos de baja latencia. `gRPC` optimiza la comunicación entre microservicios. `EKS` y `CloudWatch` permiten el escalado y monitoreo de rendimiento.
-*   **Seguridad:** `Spring Security`, `JWT`, `OAuth 2.0`, `Amazon RDS`, `Amazon S3`, `HTTPS/TLS`, `WAF` y `Auditoría` de `logs` proporcionan una defensa en profundidad y control de acceso robusto.
+*   **Testabilidad:** `Vitest`, mocks nativos, `@nestjs/testing`, `Testcontainers`, `React Testing Library`, `Cypress`/`Playwright`, junto con la `DI` de NestJS y la `Arquitectura Limpia`, garantizan una `testeabilidad` profunda.
+*   **Mantenibilidad:** `TypeScript` full-stack, `NestJS`, `React`, `React Native`, `Prisma`, `Clean Code`, `ESLint`, `Prettier`, `pnpm`, `GitHub Enterprise` y `IaC` contribuyen a un código y una infraestructura fáciles de entender, modificar y evolucionar. El lenguaje unificado entre backend y frontend reduce la carga cognitiva del equipo.
+*   **Flexibilidad/Adaptabilidad:** La `Arquitectura Limpia` desacopla el `dominio` de la tecnología. `NestJS` y `React` ofrecen un ecosistema rico para futuras expansiones. `Kubernetes` y `Terraform` facilitan la adaptación a cambios de infraestructura o crecimiento.
+*   **Rendimiento:** `Node.js` con `NestJS` (opción `Fastify`) ofrece alto rendimiento para I/O concurrente. `PostgreSQL` y `Redis` (con `ElastiCache`) son soluciones de datos de baja latencia. `tRPC`/`@nestjs/microservices` optimiza la comunicación entre microservicios. `EKS` y `CloudWatch` permiten el escalado y monitoreo de rendimiento.
+*   **Seguridad:** `Passport.js`, `@nestjs/jwt`, `Guards` de NestJS, `OAuth 2.0`, `Amazon RDS`, `Amazon S3`, `HTTPS/TLS`, `WAF` y `Auditoría` de `logs` proporcionan una defensa en profundidad y control de acceso robusto.
 *   **Escalabilidad:** `EKS` (Kubernetes), `Amazon RDS` (réplicas de lectura, sharding potencial), `Amazon S3`, `Amazon ElastiCache`, `SNS` y `SES` son intrínsecamente `escalables` y permiten un crecimiento horizontal.
 *   **Confiabilidad:** Servicios gestionados de `AWS` (`RDS`, `EKS`, `S3`, `ElastiCache`), `CI/CD` automatizado, `monitoreo` proactivo y `copias de seguridad` garantizan alta `disponibilidad` y `resiliencia`.
 
 ## 9. Conclusión
 
-El `Blueprint TS` representa la culminación de la planificación arquitectónica, traduciendo los "qué" y "cómo" de las fases anteriores en un conjunto coherente y justificado de "con qué" y "dónde". Esta fase es crítica para proporcionar una hoja de ruta clara para el equipo de desarrollo, asegurando que cada línea de código y cada componente de infraestructura se construya con una visión unificada y un propósito claro. Al elegir un stack `Cloud-Native` con tecnologías probadas y maduras, y al adherirse a principios de ingeniería rigurosos como `TDD` y `Arquitectura Limpia`, el `[ResidentAPP]` está posicionado para ser un sistema funcionalmente rico, seguro, de alto rendimiento y sostenible a largo plazo.
+El `Blueprint TS` representa la culminación de la planificación arquitectónica, traduciendo los "qué" y "cómo" de las fases anteriores en un conjunto coherente y justificado de "con qué" y "dónde". Esta fase es crítica para proporcionar una hoja de ruta clara para el equipo de desarrollo, asegurando que cada línea de código y cada componente de infraestructura se construya con una visión unificada y un propósito claro. Al elegir un stack `Cloud-Native` full-stack TypeScript con tecnologías probadas y maduras, y al adherirse a principios de ingeniería rigurosos como `TDD` y `Arquitectura Limpia`, el `[ResidentAPP]` está posicionado para ser un sistema funcionalmente rico, seguro, de alto rendimiento y sostenible a largo plazo. La decisión de unificar el lenguaje en TypeScript simplifica el ecosistema de desarrollo, permite compartir tipos e interfaces entre capas, y reduce la barrera de entrada para el equipo.
 
 ---

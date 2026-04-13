@@ -46,6 +46,7 @@ export default function App() {
   // Workspace Projects
   const [projectsList, setProjectsList] = useState([]);
   const [activeProject, setActiveProject] = useState(() => localStorage.getItem('sdd_active_project') || '');
+  const [isProjectSealed, setIsProjectSealed] = useState(false);
 
   // Load Projects on Boot
   useEffect(() => {
@@ -99,9 +100,19 @@ export default function App() {
   // Bulk Load on Background to populate Checklist Checkmarks
   useEffect(() => {
     setVfs({}); // Volver a cero al cambiar proyecto
+    setIsProjectSealed(false);
     
     const fetchAllPhasesBackground = async () => {
       if (serverMode && activeProject) {
+        // Consultar estado del candado
+        try {
+          const sealRes = await fetch(`/api/workspace/seal?projectName=${encodeURIComponent(activeProject)}`);
+          if (sealRes.ok) {
+            const sealData = await sealRes.json();
+            setIsProjectSealed(sealData.isSealed);
+          }
+        } catch(e) {}
+
         const newVfs = {};
         for (const phase of PHASES) {
           try {
@@ -154,13 +165,39 @@ export default function App() {
     setVfs(newVfsState);
     setIsSaving(false);
     
-    // Auto Avanzar Phase
+    // Auto Avanzar Phase o Sellar si es la número 10
     if (activePhaseIndex < PHASES.length - 1) {
       setActivePhaseIndex(activePhaseIndex + 1);
+    } else {
+      // Fase 10 Completada! Sellar proyecto.
+      if (serverMode && activeProject) {
+        try {
+           await fetch('/api/workspace/seal', { 
+             method: 'POST', 
+             headers: {'Content-Type':'application/json'},
+             body: JSON.stringify({ projectName: activeProject })
+           });
+           setIsProjectSealed(true);
+        } catch(e) {}
+      }
     }
   };
 
+  const handleUnlockProject = async () => {
+      if (!serverMode || !activeProject) return;
+      try {
+         await fetch(`/api/workspace/seal/${encodeURIComponent(activeProject)}`, { method: 'DELETE' });
+         setIsProjectSealed(false);
+      } catch(e) {
+         alert("Error abriendo el candado");
+      }
+  };
+
   const handleAiAction = async () => {
+    if (isProjectSealed) {
+      alert("❌ El proyecto está protegido bajo Bóveda. Abre el candado en la parte inferior para pedir nuevos borradores.");
+      return;
+    }
     if (!apiKey) {
       setShowSettings(true);
       return;
@@ -413,10 +450,10 @@ export default function App() {
               <textarea
                 value={currentContent}
                 onChange={(e) => setCurrentContent(e.target.value)}
-                placeholder="Digita libremente el contexto aquí..."
-                className="w-full h-[450px] bg-transparent text-gray-800 dark:text-gray-200 p-8 font-mono text-[14px] leading-8 resize-y focus:outline-none placeholder:text-gray-300 dark:placeholder:text-zinc-700"
+                placeholder={isProjectSealed ? "Este proyecto está protegido bajo Bóveda. Desbloquéalo abajo para continuar editando." : "Digita libremente el contexto aquí..."}
+                className={`w-full h-[450px] bg-transparent text-gray-800 dark:text-gray-200 p-8 font-mono text-[14px] leading-8 resize-y focus:outline-none placeholder:text-gray-300 dark:placeholder:text-zinc-700 ${isProjectSealed ? 'cursor-not-allowed opacity-50' : ''}`}
                 spellCheck="false"
-                disabled={isLoading}
+                disabled={isProjectSealed}
               />
             </div>
           ) : (
@@ -443,6 +480,14 @@ export default function App() {
               >
                 <Save size={18} />
                 Selecciona tu Proyecto Arriba (Disco)
+              </button>
+             ) : isProjectSealed ? (
+              <button
+                onClick={handleUnlockProject}
+                className="group flex flex-1 w-full justify-center lg:flex-none lg:w-auto items-center gap-3 px-10 py-5 bg-red-100 hover:bg-red-200 text-red-700 dark:bg-red-900/30 dark:hover:bg-red-900/50 dark:text-red-400 font-extrabold uppercase tracking-wide text-xs rounded-2xl shadow-lg transition-all transform hover:-translate-y-1"
+                title="Al abrir el candado podrás sobrescribir la arquitectura generada."
+              >
+                🔒 Habilitar Edición (Proyecto Sellado)
               </button>
              ) : (
               <button

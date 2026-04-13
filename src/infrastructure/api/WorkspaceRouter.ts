@@ -53,6 +53,47 @@ workspaceRouter.post('/projects', async (req: Request, res: Response): Promise<v
    }
 });
 
+// -- Sistema de Sellado (Bóveda) -- //
+workspaceRouter.get('/seal', async (req: Request, res: Response): Promise<void> => {
+  try {
+     const projectName = req.query.projectName as string;
+     if(!projectName) { res.status(400).json({error: 'projectName faltante'}); return; }
+     const sealPath = path.join(DEFAULT_WORKSPACES_DIR, projectName, '.sdd-sealed');
+     try {
+        await fs.access(sealPath);
+        res.status(200).json({ isSealed: true });
+     } catch {
+        res.status(200).json({ isSealed: false });
+     }
+  } catch(e) {
+     res.status(500).json({ error: 'Error leyendo sellado' });
+  }
+});
+
+workspaceRouter.post('/seal', async (req: Request, res: Response): Promise<void> => {
+  try {
+     const { projectName } = req.body;
+     if(!projectName) { res.status(400).json({error: 'projectName faltante'}); return; }
+     const sealPath = path.join(DEFAULT_WORKSPACES_DIR, projectName, '.sdd-sealed');
+     await fs.writeFile(sealPath, 'SEALED', 'utf8');
+     res.status(200).json({ message: 'Proyecto sellado con éxito' });
+  } catch(e) {
+     res.status(500).json({ error: 'Error al sellar' });
+  }
+});
+
+workspaceRouter.delete('/seal/:projectName', async (req: Request, res: Response): Promise<void> => {
+  try {
+     const { projectName } = req.params;
+     const sealPath = path.join(DEFAULT_WORKSPACES_DIR, projectName, '.sdd-sealed');
+     await fs.unlink(sealPath);
+     res.status(200).json({ message: 'Candado removido' });
+  } catch(e) {
+     // Si no existía, está bien (aunque throw). Para no asustar:
+     res.status(200).json({ message: 'Candado deshecho (o inexistente)' });
+  }
+});
+
 workspaceRouter.post('/artifact', async (req: Request, res: Response): Promise<void> => {
   try {
     const parsed = SaveArtifactSchema.parse(req.body);

@@ -124,12 +124,12 @@ System_Ext(payment_gateway, "Pasarela de Pagos", "Sistema externo para procesar 
 System_Ext(notification_service, "Servicio de Notificaciones", "Sistema externo para envío de emails y SMS")
 System_Ext(accounting_system, "Sistema de Contabilidad PH", "Sistema externo para gestión contable y financiera de la PH")
 
-Container(web_app_admin, "ResidentAPP Web Portal", "Aplicación Web (SPA: Angular/React)", "Proporciona interfaz de gestión para Administradores y Revisor Fiscal.")
-Container(mobile_app_residente, "ResidentAPP Mobile App", "Aplicación Móvil (iOS/Android)", "Proporciona interfaz para Residentes y Copropietarios.")
-Container(api_gateway, "ResidentAPP API", "API RESTful (Java Spring Boot / .NET Core)", "API central que expone la lógica de negocio a las aplicaciones cliente.")
+Container(web_app_admin, "ResidentAPP Web Portal", "Aplicación Web (SPA: React 18.x / TypeScript)", "Proporciona interfaz de gestión para Administradores y Revisor Fiscal.")
+Container(mobile_app_residente, "ResidentAPP Mobile App", "Aplicación Móvil (React Native / TypeScript)", "Proporciona interfaz para Residentes y Copropietarios.")
+Container(api_gateway, "ResidentAPP API", "API RESTful (NestJS / TypeScript)", "API central que expone la lógica de negocio a las aplicaciones cliente.")
 Container(database, "Base de Datos", "PostgreSQL", "Almacena todos los datos transaccionales de la PH (Residentes, UP, finanzas, reservas, etc.).")
 Container(document_storage, "Almacén de Documentos", "Amazon S3 / Azure Blob Storage", "Almacena documentos como RNC, actas, comunicados en formatos PDF.")
-Container(reporting_service, "Servicio de Reporting", "Microservicio (Python/Node.js)", "Genera reportes complejos (ej. Estados de Cuenta PDF, informes de gestión).")
+Container(reporting_service, "Servicio de Reporting", "Microservicio (NestJS / TypeScript)", "Genera reportes complejos (ej. Estados de Cuenta PDF, informes de gestión).")
 
 Rel(residente, mobile_app_residente, "Utiliza", "HTTPS")
 Rel(mobile_app_residente, api_gateway, "Consumo de API", "JSON/HTTPS")
@@ -138,13 +138,13 @@ Rel(administrador, web_app_admin, "Utiliza", "HTTPS")
 Rel(revisor_fiscal, web_app_admin, "Utiliza", "HTTPS")
 Rel(web_app_admin, api_gateway, "Consumo de API", "JSON/HTTPS")
 
-Rel(api_gateway, database, "Lee/Escribe datos", "JDBC/ORM")
+Rel(api_gateway, database, "Lee/Escribe datos", "Prisma ORM")
 Rel(api_gateway, document_storage, "Almacena/Recupera documentos", "SDK/API")
 Rel(api_gateway, payment_gateway, "Procesa pagos", "HTTPS/API")
 Rel(api_gateway, notification_service, "Envía notificaciones", "HTTPS/API")
-Rel(api_gateway, reporting_service, "Solicita generación de reportes", "gRPC/HTTPS")
+Rel(api_gateway, reporting_service, "Solicita generación de reportes", "tRPC/HTTPS")
 
-Rel(reporting_service, database, "Lee datos para reportes", "JDBC/ORM")
+Rel(reporting_service, database, "Lee datos para reportes", "Prisma ORM")
 Rel(reporting_service, document_storage, "Guarda reportes generados (ej. PDFs)", "SDK/API")
 
 Rel_R(api_gateway, accounting_system, "Sincronización de datos (push/pull)", "HTTPS/API/Batch")
@@ -182,8 +182,8 @@ Container_Boundary(api, "ResidentAPP API") {
     Component(account_repo_port, "AccountRepository Port", "Interface Gateway", "Define el contrato para la persistencia de datos financieros.")
     Component(resident_repo_port, "ResidentRepository Port", "Interface Gateway", "Define el contrato para la persistencia de datos de residentes.")
 
-    Component(account_repo_adapter, "AccountRepository Adapter", "JPA/ORM Implementation", "Implementa AccountRepository Port usando PostgreSQL.")
-    Component(resident_repo_adapter, "ResidentRepository Adapter", "JPA/ORM Implementation", "Implementa ResidentRepository Port usando PostgreSQL.")
+    Component(account_repo_adapter, "AccountRepository Adapter", "Prisma ORM Implementation", "Implementa AccountRepository Port usando PostgreSQL.")
+    Component(resident_repo_adapter, "ResidentRepository Adapter", "Prisma ORM Implementation", "Implementa ResidentRepository Port usando PostgreSQL.")
 
     Component(reporting_client, "ReportingServiceClient", "API Client", "Cliente para interactuar con el Servicio de Reporting.")
 
@@ -196,8 +196,8 @@ Container_Boundary(api, "ResidentAPP API") {
     Rel(account_use_case, resident_repo_port, "Usa interfaz para persistencia", "DIP")
     Rel(account_use_case, reporting_client, "Solicita generación de PDF")
 
-    Rel(account_repo_adapter, account_repo_port, "Implementa", "JPA/ORM")
-    Rel(resident_repo_adapter, resident_repo_port, "Implementa", "JPA/ORM")
+    Rel(account_repo_adapter, account_repo_port, "Implementa", "Prisma ORM")
+    Rel(resident_repo_adapter, resident_repo_port, "Implementa", "Prisma ORM")
 
 }
 
@@ -206,9 +206,9 @@ System_Boundary(external, "Sistemas Externos e Infraestructura") {
     Container_Ext(reporting_service, "Servicio de Reporting", "Microservicio")
 }
 
-Rel(account_repo_adapter, database, "Lee/Escribe datos", "JDBC/ORM")
-Rel(resident_repo_adapter, database, "Lee/Escribe datos", "JDBC/ORM")
-Rel(reporting_client, reporting_service, "Invoca API", "gRPC/HTTPS")
+Rel(account_repo_adapter, database, "Lee/Escribe datos", "Prisma ORM")
+Rel(resident_repo_adapter, database, "Lee/Escribe datos", "Prisma ORM")
+Rel(reporting_client, reporting_service, "Invoca API", "tRPC/HTTPS")
 
 @enduml
 ```
@@ -220,7 +220,7 @@ Dentro de la `ResidentAPP API`, los `Componentes` se organizan de acuerdo a la `
 *   **Adaptadores de Interfaz:**
     *   `AccountController` actúa como el `Controlador` para las solicitudes REST.
     *   `AccountRepository Port` y `ResidentRepository Port` son las interfaces (`Gateways`) que los `Casos de Uso` utilizan para acceder a la persistencia (cumpliendo `DIP`).
-    *   `AccountRepository Adapter` y `ResidentRepository Adapter` son las implementaciones concretas de esos `Gateways`, utilizando un `ORM` para interactuar con la `Base de Datos`.
+    *   `AccountRepository Adapter` y `ResidentRepository Adapter` son las implementaciones concretas de esos `Gateways`, utilizando `Prisma ORM` para interactuar con la `Base de Datos`.
     *   `ReportingServiceClient` es un adaptador para el `Servicio de Reporting`.
 *   **Regla de Dependencia:** Las flechas de dependencia siempre apuntan hacia adentro, desde los `Controladores` hacia los `Casos de Uso` y `Entidades`, y desde las implementaciones de repositorios hacia sus interfaces, asegurando la `Independencia de Bases de Datos` e `Independencia de Frameworks`. La `Testabilidad` de `AccountUseCase` está garantizada, ya que se puede probar sin la necesidad de una base de datos real, mockeando los `Ports`.
 
@@ -241,77 +241,77 @@ package "Application Layer (Use Cases)" {
         - accountRepository: AccountRepositoryPort
         - residentRepository: ResidentRepositoryPort
         - reportingService: ReportingServiceClient
-        + execute(query: ConsultaEstadoCuentaQuery): EstadoCuentaDTO
+        + execute(query: ConsultaEstadoCuentaQuery): Promise<EstadoCuentaDTO>
     }
 }
 
 package "Domain Layer (Entities)" {
     class EstadoCuenta {
-        - id: UUID
-        - unidadPrivadaId: UUID
-        - periodo: String
-        - saldoActual: BigDecimal
-        - movimientos: List<MovimientoFinanciero>
-        + calcularSaldo(): BigDecimal
-        + aplicarPago(monto: BigDecimal)
+        - id: string
+        - unidadPrivadaId: string
+        - periodo: string
+        - saldoActual: Decimal
+        - movimientos: MovimientoFinanciero[]
+        + calcularSaldo(): Decimal
+        + aplicarPago(monto: Decimal): void
     }
 
     class MovimientoFinanciero {
-        - tipo: String (Expensa, Pago, CuotaExtraordinaria)
-        - valor: BigDecimal
-        - fecha: LocalDate
-        - descripcion: String
+        - tipo: string (Expensa, Pago, CuotaExtraordinaria)
+        - valor: Decimal
+        - fecha: Date
+        - descripcion: string
     }
 
     class Residente {
-        - id: UUID
-        - nombre: String
-        - email: String
-        - unidadesAsociadas: List<UnidadPrivada>
-        + tieneAcceso(unidadId: UUID): boolean
+        - id: string
+        - nombre: string
+        - email: string
+        - unidadesAsociadas: UnidadPrivada[]
+        + tieneAcceso(unidadId: string): boolean
     }
 
     class UnidadPrivada {
-        - id: UUID
-        - numero: String
-        - coeficiente: BigDecimal
-        - propietarioId: UUID
+        - id: string
+        - numero: string
+        - coeficiente: Decimal
+        - propietarioId: string
     }
 }
 
 package "Interface Adapters (Ports)" {
     interface AccountRepositoryPort {
-        + findByUnidadPrivadaId(unidadId: UUID): EstadoCuenta
-        + save(estadoCuenta: EstadoCuenta)
+        + findByUnidadPrivadaId(unidadId: string): Promise<EstadoCuenta | null>
+        + save(estadoCuenta: EstadoCuenta): Promise<void>
     }
 
     interface ResidentRepositoryPort {
-        + findById(residenteId: UUID): Residente
+        + findById(residenteId: string): Promise<Residente | null>
     }
 
     interface ReportingServiceClient {
-        + generateEstadoCuentaPdf(estadoCuentaId: UUID): byte[]
+        + generateEstadoCuentaPdf(estadoCuentaId: string): Promise<Buffer>
     }
 }
 
 package "Interface Adapters (DTOs)" {
     class ConsultaEstadoCuentaQuery {
-        - residenteId: UUID
-        - unidadPrivadaId: UUID
+        - residenteId: string
+        - unidadPrivadaId: string
     }
 
     class EstadoCuentaDTO {
-        - numeroUnidad: String
-        - saldoTotal: BigDecimal
-        - detalleMovimientos: List<MovimientoDTO>
-        - urlDescargaPDF: String
+        - numeroUnidad: string
+        - saldoTotal: number
+        - detalleMovimientos: MovimientoDTO[]
+        - urlDescargaPDF: string
     }
 
     class MovimientoDTO {
-        - tipo: String
-        - valor: BigDecimal
-        - fecha: LocalDate
-        - descripcion: String
+        - tipo: string
+        - valor: number
+        - fecha: Date
+        - descripcion: string
     }
 }
 
