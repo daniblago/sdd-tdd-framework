@@ -66,6 +66,6 @@ npm run test:coverage
 
 Este repositorio incluye un archivo AGENT.md diseñado para actuar como el system prompt definitivo, obligando a la IA a seguir el protocolo de avance por fases sin improvisar.
 
-Autor: Daniel B
+Autor: Daniel Blandón
 
 Licencia: MIT

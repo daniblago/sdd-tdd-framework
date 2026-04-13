@@ -1,6 +1,29 @@
 import { Router, Request, Response } from 'express';
+import { promises as fs } from 'fs';
+import path from 'path';
 
 export const authRouter = Router();
+
+const USERS_FILE = path.join(process.cwd(), 'users.json');
+
+const DEFAULT_USERS = [
+  { username: 'admin', password: 'architect123', role: 'ARCHITECT' },
+  { username: 'dev', password: 'dev123', role: 'DEVELOPER' }
+];
+
+async function loadUsers() {
+  try {
+    const data = await fs.readFile(USERS_FILE, 'utf8');
+    return JSON.parse(data);
+  } catch (err: any) {
+    if (err.code === 'ENOENT') {
+      // Auto-healing local File Creation si el admin lo rompe
+      await fs.writeFile(USERS_FILE, JSON.stringify(DEFAULT_USERS, null, 2), 'utf8');
+      return DEFAULT_USERS;
+    }
+    return DEFAULT_USERS; // Tolerancia fallos
+  }
+}
 
 authRouter.post('/login', async (req: Request, res: Response): Promise<void> => {
   const { username, password } = req.body;
@@ -10,19 +33,12 @@ authRouter.post('/login', async (req: Request, res: Response): Promise<void> => 
     return;
   }
 
-  // Bóveda de usuarios In-Memory respaldada por Variables de Entorno (.env)
-  const ADMIN_USER = process.env.ADMIN_USER || 'admin';
-  const ADMIN_PASS = process.env.ADMIN_PASS || 'architect123';
-  const DEV_USER = process.env.DEV_USER || 'dev';
-  const DEV_PASS = process.env.DEV_PASS || 'dev123';
+  const users = await loadUsers();
+  
+  const userMatch = users.find((u: any) => u.username === username && u.password === password);
 
-  if (username === ADMIN_USER && password === ADMIN_PASS) {
-    res.status(200).json({ status: 'ok', user: { username: ADMIN_USER, role: 'ARCHITECT' } });
-    return;
-  }
-
-  if (username === DEV_USER && password === DEV_PASS) {
-    res.status(200).json({ status: 'ok', user: { username: DEV_USER, role: 'DEVELOPER' } });
+  if (userMatch) {
+    res.status(200).json({ status: 'ok', user: { username: userMatch.username, role: userMatch.role } });
     return;
   }
 
