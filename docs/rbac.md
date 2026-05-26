@@ -1,3 +1,0 @@
-# 6. Seguridad (RBAC)
-
-Comienza a documentar esta fase aquí...

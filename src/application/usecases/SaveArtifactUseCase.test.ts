@@ -12,7 +12,7 @@ describe('SaveArtifactUseCase', () => {
     const useCase = new SaveArtifactUseCase(mockFsPort);
     
     const payload = {
-      relativePath: 'specs/001-framework-core/spec.md',
+      relativePath: 'docs/03-especificacion-funcional.md',
       content: '# Especificación Funcional'
     };
 

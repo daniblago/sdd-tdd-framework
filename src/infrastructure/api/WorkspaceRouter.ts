@@ -74,7 +74,29 @@ workspaceRouter.post('/projects', authMiddleware, architectOnly, async (req: Req
      if (!projectName) { res.status(400).json({ error: 'projectName requerido' }); return; }
      if (!/^[a-zA-Z0-9_-]+$/.test(projectName)) { res.status(400).json({ error: 'Protección Path Traversal' }); return; }
      const targetPath = path.join(DEFAULT_WORKSPACES_DIR, projectName);
+     const docsPath = path.join(targetPath, 'docs');
+     
      await fs.mkdir(targetPath, { recursive: true });
+     await fs.mkdir(docsPath, { recursive: true });
+
+     const templates = [
+       { name: '01-constitucion.md', title: '# 01. Constitución del Proyecto\n\nDefine los principios de gobernanza, calidad y arquitectura limpia.' },
+       { name: '02-glosario.md', title: '# 02. Glosario de Dominio\n\nLista de términos de negocio empresariales y sus definiciones (Lenguaje Ubicuo).' },
+       { name: '03-especificacion-funcional.md', title: '# 03. Especificación Funcional\n\nHistorias de usuario y criterios de aceptación detallados.' },
+       { name: '04-arquitectura-y-blueprint.md', title: '# 04. Arquitectura de Alto Nivel y Blueprint\n\nDiagramas de arquitectura C4 (Mermaid) y registros ADR.' },
+       { name: '05-modelo-datos.md', title: '# 05. Modelo de Datos y Cargas\n\nEntidades persistentes, relaciones, contratos JSON y sincronización.' },
+       { name: '06-roles-y-acceso.md', title: '# 06. Matriz de Roles y Control de Acceso\n\nMatriz RBAC (rol vs acción vs recurso).' },
+       { name: '07-flujos.md', title: '# 07. Workflows Operativos\n\nDiagramas de estados y workflows de transiciones del negocio.' },
+       { name: '08-plan-tecnico.md', title: '# 08. Plan Técnico de Implementación\n\nDefinición del stack tecnológico final y estructura de módulos.' },
+       { name: '09-backlog-tdd.md', title: '# 09. Backlog de Tareas Orientado a TDD\n\nLista de tareas unitarias descompiladas bajo el ciclo RED/GREEN/REFACTOR.' },
+       { name: '10-implementacion.md', title: '# 10. Implementación y Verificación TDD\n\nReporte de la construcción y verificación final del código.' }
+     ];
+
+     for (const temp of templates) {
+       const filePath = path.join(docsPath, temp.name);
+       await fs.writeFile(filePath, temp.title, 'utf8');
+     }
+
      res.status(200).json({ message: 'OK', project: projectName });
    } catch(err) {
      res.status(500).json({ error: 'Error creando proyecto' });
