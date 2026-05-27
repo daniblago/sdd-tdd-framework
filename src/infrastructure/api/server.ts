@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import { env } from '../config/env.js';
-import { workspaceRouter } from './WorkspaceRouter.js';
+import { createWorkspaceRouter } from './WorkspaceRouter.js';
 import { authRouter } from './AuthRouter.js';
 
 const config = env();
@@ -20,7 +20,7 @@ app.get('/', (_req, res) => {
   });
 });
 
-app.use('/api/workspace', workspaceRouter);
+app.use('/api/workspace', createWorkspaceRouter());
 app.use('/api/auth', authRouter);
 
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

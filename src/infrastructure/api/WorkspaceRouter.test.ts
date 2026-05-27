@@ -5,7 +5,7 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import os from 'os';
 import jwt from 'jsonwebtoken';
-import { workspaceRouter, resetWorkspaceForTests } from './WorkspaceRouter.js';
+import { createWorkspaceRouter, resetWorkspaceForTests } from './WorkspaceRouter.js';
 import { resetEnvForTests } from '../config/env.js';
 
 const TEST_SECRET = 'test-secret-with-32-chars-minimum-yes';
@@ -14,7 +14,7 @@ let tempDir: string;
 const buildApp = () => {
   const app = express();
   app.use(express.json());
-  app.use('/api/workspace', workspaceRouter);
+  app.use('/api/workspace', createWorkspaceRouter());
   return app;
 };
 
