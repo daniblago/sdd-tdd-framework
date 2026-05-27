@@ -3,6 +3,62 @@
 Todos los cambios notables a este proyecto se documentan aquí.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/) y el versionado [SemVer](https://semver.org/).
 
+## [Unreleased] — Fase 2 del refactor: Split del WorkspaceRouter + puerto AiProvider
+
+Ver [ADR-005](docs/adr/ADR-005-split-workspace-router.md) para la justificación completa.
+
+### Added
+- `src/domain/ports/AiProvider.ts` — puerto para drafting de IA (+ `AiProviderError`).
+- `src/domain/ports/ProjectRepository.ts` — puerto para CRUD + sellado de proyectos.
+- `src/domain/ports/ProjectArchiver.ts` — puerto para empaquetado a ZIP.
+- `src/domain/ProjectTemplates.ts` — constante `readonly` con las 10 plantillas de doc
+  por fase (antes inline en el router).
+- `src/infrastructure/filesystem/LocalProjectRepository.ts` — adapter que implementa
+  `ProjectRepository` sobre `fs/promises`.
+- `src/infrastructure/filesystem/ArchiverProjectArchiver.ts` — adapter sobre `archiver`.
+- `src/infrastructure/ai/OpenAiAdapter.ts` — gpt-4o vía chat/completions.
+- `src/infrastructure/ai/AnthropicAdapter.ts` — claude-3-5-sonnet-latest vía /v1/messages.
+- `src/infrastructure/ai/GeminiAdapter.ts` — gemini-1.5-flash con fallback dinámico
+  encapsulado como estado de instancia (antes era un `let` global mutable).
+- `src/infrastructure/ai/AiProviderFactory.ts` — resuelve adapter por nombre, cachea.
+- `src/application/usecases/ListProjectsUseCase.ts` — lista proyectos ordenados.
+- `src/application/usecases/CreateProjectUseCase.ts` — crea + siembra plantillas;
+  rechaza recreación de proyecto existente (409).
+- `src/application/usecases/ProjectSealUseCases.ts` — `Seal`, `Unseal`,
+  `GetProjectSealStatus`.
+- `src/application/usecases/PackageProjectUseCase.ts` — orquesta repo + archiver;
+  lanza `ProjectNotFoundError` si el proyecto no existe.
+- `src/application/usecases/DraftWithAiUseCase.ts` — valida `apiKey` y delega al
+  proveedor; propaga `AiProviderError` sin envolverlo.
+- `src/infrastructure/api/middleware/authMiddleware.ts` — middlewares extraídos
+  (`authMiddleware` + `architectOnly`), con 8 tests propios.
+- `src/infrastructure/api/ProjectRouter.ts` — router thin: list/create/seal endpoints.
+- `src/infrastructure/api/ArtifactRouter.ts` — router thin: GET/POST /artifact.
+- `src/infrastructure/api/DownloadRouter.ts` — router thin: download-ticket + download.
+- `src/infrastructure/api/AiRouter.ts` — router thin: ai-status + ai-draft.
+
+### Changed
+- `src/infrastructure/api/WorkspaceRouter.ts` — antes 370 líneas de god router; ahora
+  un composer thin (~70 líneas) que cablea los adapters → use cases → 4 sub-routers.
+  Exporta `createWorkspaceRouter(): Router` (factory) en lugar de un `Router` mutable.
+- `src/infrastructure/api/server.ts` — usa la factory `createWorkspaceRouter()`.
+- `vitest.config.ts` — quita el patrón `tests/**/*.test.ts` (ya no existe esa carpeta).
+
+### Removed
+- `tests/unit/Specification.test.ts` — subconjunto literal de
+  `src/domain/Specification.test.ts`. Carpeta `tests/` eliminada.
+- `src/domain/User.ts` y `src/domain/User.test.ts` — clase vestigial sin uso real.
+- El `let activeAiModel` mutable global del antiguo `WorkspaceRouter` — ahora es
+  estado de instancia encapsulado en `GeminiAdapter`.
+
+### Moved
+- `tests/unit/SpecManager.test.ts` → `src/application/SpecManager.test.ts` (co-located).
+- `tests/unit/TaskManager.test.ts` → `src/application/TaskManager.test.ts` (co-located).
+
+### Tests
+- 159 tests pasando (26 archivos), un +42% sobre Fase 1.
+- Cobertura: Statements 90.95%, Branches 83.79%, Functions 98.44%, Lines 92.96%.
+
 ## [Unreleased] — Fase 1 del refactor: Seguridad y Configuración
 
 Ver [ADR-004](docs/adr/ADR-004-seguridad-fase-1.md) para la justificación completa.

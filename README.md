@@ -93,12 +93,35 @@ El framework aplica las siguientes garantías (ver [ADR-004](docs/adr/ADR-004-se
 🧪 Cobertura actual
 
 ```
-Statements   : 87.36%
-Branches     : 82.15%
-Functions    : 93.18%
-Lines        : 89.24%
-112 tests / 16 archivos
+Statements   : 90.95%
+Branches     : 83.79%
+Functions    : 98.44%
+Lines        : 92.96%
+159 tests / 26 archivos
 ```
+
+🏗️ Arquitectura
+
+```
+src/
+  domain/
+    ports/                     # AiProvider, ProjectRepository, ProjectArchiver, FileSystemPort
+    security/                  # PasswordHasher, UserRepository
+    ProjectPath.ts             # Value Object anti-traversal
+    ProjectTemplates.ts        # 10 plantillas de fase (readonly)
+    Specification.ts / Task.ts
+  application/usecases/        # 1 caso de uso por operación de usuario
+  infrastructure/
+    ai/                        # OpenAi, Anthropic, Gemini adapters + Factory
+    api/                       # ProjectRouter, ArtifactRouter, DownloadRouter, AiRouter
+      middleware/              # authMiddleware + architectOnly
+      WorkspaceRouter.ts       # composer thin que monta los 4 sub-routers
+    config/env.ts              # Zod-validated env loader
+    filesystem/                # LocalFileSystemAdapter, LocalProjectRepository, ArchiverProjectArchiver
+    security/                  # BcryptHasher, JsonUserRepository, DownloadTicketStore
+```
+
+Decisiones arquitectónicas registradas en [docs/adr/](docs/adr/).
 
 🤖 Uso con Agentes de IA
 
