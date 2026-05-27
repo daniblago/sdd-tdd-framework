@@ -1,36 +1,35 @@
 import express from 'express';
 import cors from 'cors';
+import { env } from '../config/env.js';
 import { workspaceRouter } from './WorkspaceRouter.js';
+import { authRouter } from './AuthRouter.js';
+
+const config = env();
 
 const app = express();
-const PORT = process.env.PORT || 3000;
 
-// Middlewares globales
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 
-// Main Health Check (Evita 404 al abrir en el navegador)
-app.get('/', (req, res) => {
+app.get('/', (_req, res) => {
   res.json({
     name: 'SDD-TDD Orchestrator API',
     status: 'Running',
-    version: '1.0.0'
+    version: '1.0.0',
+    env: config.nodeEnv
   });
 });
 
-// Registro de Rutas
-import { authRouter } from './AuthRouter.js';
 app.use('/api/workspace', workspaceRouter);
 app.use('/api/auth', authRouter);
 
-// Handler genérico de errores
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error(err.stack);
-  res.status(500).send({ error: 'Something broke!' });
+app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  if (!config.isProduction) console.error(err);
+  res.status(500).send({ error: 'Internal error' });
 });
 
-export const server = app.listen(PORT, () => {
+export const server = app.listen(config.port, () => {
   console.log(`============= SDD-TDD Orchestrator =============`);
-  console.log(`🚀 API Generador de Artefactos escuchando en puerto ${PORT}`);
-  console.log(`===============================================`);
+  console.log(`API escuchando en puerto ${config.port} (env=${config.nodeEnv})`);
+  console.log(`================================================`);
 });

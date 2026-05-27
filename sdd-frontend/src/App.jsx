@@ -485,12 +485,26 @@ export default function App() {
                 <span className="uppercase tracking-[0.15em]">{currentUser.role}</span>
              </div>
              
-             <button 
-               onClick={() => {
-                 if(activeProject) {
-                   window.location.href = `/api/workspace/download/${encodeURIComponent(activeProject)}?token=${localStorage.getItem('sdd_token')}`;
-                 } else {
+             <button
+               onClick={async () => {
+                 if(!activeProject) {
                    alert("Selecciona un proyecto activo en el disco físico primero.");
+                   return;
+                 }
+                 try {
+                   const res = await apiFetch('/api/workspace/download-ticket', {
+                     method: 'POST',
+                     headers: { 'Content-Type': 'application/json' },
+                     body: JSON.stringify({ projectName: activeProject })
+                   });
+                   if (!res.ok) {
+                     alert("No se pudo generar el ticket de descarga.");
+                     return;
+                   }
+                   const { ticket } = await res.json();
+                   window.location.href = `/api/workspace/download/${encodeURIComponent(activeProject)}?ticket=${encodeURIComponent(ticket)}`;
+                 } catch (e) {
+                   alert("Error solicitando descarga.");
                  }
                }}
                className="p-1.5 bg-white dark:bg-[#121215] hover:bg-emerald-50 dark:hover:bg-emerald-900/20 text-gray-400 hover:text-emerald-500 rounded-lg border border-gray-100 dark:border-zinc-800 transition-colors shadow-sm"

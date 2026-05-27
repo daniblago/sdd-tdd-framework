@@ -2,24 +2,38 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import archiver from 'archiver';
 import jwt from 'jsonwebtoken';
+import * as fs from 'fs/promises';
+import path from 'path';
 import { SaveArtifactUseCase } from '../../application/usecases/SaveArtifactUseCase.js';
 import { ReadArtifactUseCase } from '../../application/usecases/ReadArtifactUseCase.js';
 import { LocalFileSystemAdapter } from '../filesystem/LocalFileSystemAdapter.js';
-import * as fs from 'fs/promises';
-import * as path from 'path';
+import { env } from '../config/env.js';
+import { ProjectName, ResolvedArtifactPath } from '../../domain/ProjectPath.js';
+import { DownloadTicketStore } from '../security/DownloadTicket.js';
 
 export const workspaceRouter = Router();
 
-const DEFAULT_WORKSPACES_DIR = path.join(process.cwd(), 'workspaces');
-const JWT_SECRET = process.env.JWT_SECRET || 'sdd_super_secret_local_key';
-
-const ensureWorkspacesDir = async () => {
-   try { await fs.mkdir(DEFAULT_WORKSPACES_DIR, { recursive: true }); } catch (e) {}
-}
+const ensureWorkspacesDir = async (): Promise<void> => {
+  try { await fs.mkdir(env().workspacesDir, { recursive: true }); } catch {}
+};
 ensureWorkspacesDir();
 
-const getUseCasesForProject = (projectName: string) => {
-  const projectRoot = path.join(DEFAULT_WORKSPACES_DIR, projectName);
+let ticketStoreSingleton: DownloadTicketStore | null = null;
+const getTicketStore = (): DownloadTicketStore => {
+  if (!ticketStoreSingleton) {
+    ticketStoreSingleton = new DownloadTicketStore({ ttlMs: 30_000, secret: env().jwtSecret });
+    const handle = setInterval(() => ticketStoreSingleton?.cleanup(), 60_000) as unknown as { unref?: () => void };
+    handle.unref?.();
+  }
+  return ticketStoreSingleton;
+};
+
+export function resetWorkspaceForTests(): void {
+  ticketStoreSingleton = null;
+}
+
+const getUseCasesForProject = (project: ProjectName) => {
+  const projectRoot = path.join(env().workspacesDir, project.value);
   const fsAdapter = new LocalFileSystemAdapter(projectRoot);
   return {
     saveArtifactUseCase: new SaveArtifactUseCase(fsAdapter),
@@ -28,303 +42,326 @@ const getUseCasesForProject = (projectName: string) => {
 };
 
 const SaveArtifactSchema = z.object({
-  projectName: z.string().min(1, 'El projectName es requerido').regex(/^[a-zA-Z0-9_-]+$/, 'Hack Prevented: Nombres de proyecto inválidos.'),
-  relativePath: z.string().min(1, 'El relativePath es requerido').refine(val => !val.includes('..'), { message: 'Hack Prevented: Path Traversal detectado.'}),
+  projectName: z.string().min(1),
+  relativePath: z.string().min(1),
   content: z.string()
 });
 
-// Middleware JWT
 const authMiddleware = (req: Request, res: Response, next: NextFunction): void => {
   const authHeader = req.headers.authorization;
-  const token = (authHeader && authHeader.startsWith('Bearer ')) ? authHeader.split(' ')[1] : req.query.token as string;
-  if (!token) {
-     res.status(401).json({ error: 'Falta Token de Acceso' });
-     return;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    res.status(401).json({ error: 'Falta token de acceso (header Authorization: Bearer ...)' });
+    return;
   }
   try {
-     const decoded = jwt.verify(token, JWT_SECRET) as any;
-     (req as any).user = decoded;
-     next();
-  } catch(e) {
-     res.status(401).json({ error: 'Token Inválido o Expirado' });
+    const decoded = jwt.verify(authHeader.slice(7), env().jwtSecret) as any;
+    (req as any).user = decoded;
+    next();
+  } catch {
+    res.status(401).json({ error: 'Token inválido o expirado' });
   }
 };
 
 const architectOnly = (req: Request, res: Response, next: NextFunction): void => {
-   if ((req as any).user?.role !== 'ARCHITECT') {
-      res.status(403).json({ error: 'OWASP 403: Acción bloqueada. No posees rol ARCHITECT.' });
-      return;
-   }
-   next();
+  if ((req as any).user?.role !== 'ARCHITECT') {
+    res.status(403).json({ error: 'Acción restringida al rol ARCHITECT' });
+    return;
+  }
+  next();
 };
 
-workspaceRouter.get('/projects', authMiddleware, async (req: Request, res: Response): Promise<void> => {
-   try {
-     const entries = await fs.readdir(DEFAULT_WORKSPACES_DIR, { withFileTypes: true });
-     const projects = entries.filter(e => e.isDirectory()).map(e => e.name);
-     res.status(200).json({ projects });
-   } catch(err) {
-     res.status(500).json({ error: 'Error leyendo proyectos' });
-   }
+workspaceRouter.get('/projects', authMiddleware, async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const entries = await fs.readdir(env().workspacesDir, { withFileTypes: true });
+    const projects = entries.filter(e => e.isDirectory()).map(e => e.name);
+    res.status(200).json({ projects });
+  } catch {
+    res.status(500).json({ error: 'Error leyendo proyectos' });
+  }
 });
+
+const PROJECT_TEMPLATES: Array<{ name: string; title: string }> = [
+  { name: '01-constitucion.md', title: '# 01. Constitución del Proyecto\n\nDefine los principios de gobernanza, calidad y arquitectura limpia.' },
+  { name: '02-glosario.md', title: '# 02. Glosario de Dominio\n\nLista de términos de negocio empresariales y sus definiciones (Lenguaje Ubicuo).' },
+  { name: '03-especificacion-funcional.md', title: '# 03. Especificación Funcional\n\nHistorias de usuario y criterios de aceptación detallados.' },
+  { name: '04-arquitectura-y-blueprint.md', title: '# 04. Arquitectura de Alto Nivel y Blueprint\n\nDiagramas de arquitectura C4 (Mermaid) y registros ADR.' },
+  { name: '05-modelo-datos.md', title: '# 05. Modelo de Datos y Cargas\n\nEntidades persistentes, relaciones, contratos JSON y sincronización.' },
+  { name: '06-roles-y-acceso.md', title: '# 06. Matriz de Roles y Control de Acceso\n\nMatriz RBAC (rol vs acción vs recurso).' },
+  { name: '07-flujos.md', title: '# 07. Workflows Operativos\n\nDiagramas de estados y workflows de transiciones del negocio.' },
+  { name: '08-plan-tecnico.md', title: '# 08. Plan Técnico de Implementación\n\nDefinición del stack tecnológico final y estructura de módulos.' },
+  { name: '09-backlog-tdd.md', title: '# 09. Backlog de Tareas Orientado a TDD\n\nLista de tareas unitarias descompiladas bajo el ciclo RED/GREEN/REFACTOR.' },
+  { name: '10-implementacion.md', title: '# 10. Implementación y Verificación TDD\n\nReporte de la construcción y verificación final del código.' }
+];
 
 workspaceRouter.post('/projects', authMiddleware, architectOnly, async (req: Request, res: Response): Promise<void> => {
-   try {
-     const { projectName } = req.body;
-     if (!projectName) { res.status(400).json({ error: 'projectName requerido' }); return; }
-     if (!/^[a-zA-Z0-9_-]+$/.test(projectName)) { res.status(400).json({ error: 'Protección Path Traversal' }); return; }
-     const targetPath = path.join(DEFAULT_WORKSPACES_DIR, projectName);
-     const docsPath = path.join(targetPath, 'docs');
-     
-     await fs.mkdir(targetPath, { recursive: true });
-     await fs.mkdir(docsPath, { recursive: true });
-
-     const templates = [
-       { name: '01-constitucion.md', title: '# 01. Constitución del Proyecto\n\nDefine los principios de gobernanza, calidad y arquitectura limpia.' },
-       { name: '02-glosario.md', title: '# 02. Glosario de Dominio\n\nLista de términos de negocio empresariales y sus definiciones (Lenguaje Ubicuo).' },
-       { name: '03-especificacion-funcional.md', title: '# 03. Especificación Funcional\n\nHistorias de usuario y criterios de aceptación detallados.' },
-       { name: '04-arquitectura-y-blueprint.md', title: '# 04. Arquitectura de Alto Nivel y Blueprint\n\nDiagramas de arquitectura C4 (Mermaid) y registros ADR.' },
-       { name: '05-modelo-datos.md', title: '# 05. Modelo de Datos y Cargas\n\nEntidades persistentes, relaciones, contratos JSON y sincronización.' },
-       { name: '06-roles-y-acceso.md', title: '# 06. Matriz de Roles y Control de Acceso\n\nMatriz RBAC (rol vs acción vs recurso).' },
-       { name: '07-flujos.md', title: '# 07. Workflows Operativos\n\nDiagramas de estados y workflows de transiciones del negocio.' },
-       { name: '08-plan-tecnico.md', title: '# 08. Plan Técnico de Implementación\n\nDefinición del stack tecnológico final y estructura de módulos.' },
-       { name: '09-backlog-tdd.md', title: '# 09. Backlog de Tareas Orientado a TDD\n\nLista de tareas unitarias descompiladas bajo el ciclo RED/GREEN/REFACTOR.' },
-       { name: '10-implementacion.md', title: '# 10. Implementación y Verificación TDD\n\nReporte de la construcción y verificación final del código.' }
-     ];
-
-     for (const temp of templates) {
-       const filePath = path.join(docsPath, temp.name);
-       await fs.writeFile(filePath, temp.title, 'utf8');
-     }
-
-     res.status(200).json({ message: 'OK', project: projectName });
-   } catch(err) {
-     res.status(500).json({ error: 'Error creando proyecto' });
-   }
+  let project: ProjectName;
+  try {
+    project = ProjectName.from(req.body?.projectName);
+  } catch (e) {
+    res.status(400).json({ error: (e as Error).message });
+    return;
+  }
+  try {
+    const targetPath = path.join(env().workspacesDir, project.value);
+    const docsPath = path.join(targetPath, 'docs');
+    await fs.mkdir(docsPath, { recursive: true });
+    for (const t of PROJECT_TEMPLATES) {
+      await fs.writeFile(path.join(docsPath, t.name), t.title, 'utf8');
+    }
+    res.status(200).json({ message: 'OK', project: project.value });
+  } catch {
+    res.status(500).json({ error: 'Error creando proyecto' });
+  }
 });
 
-// -- Sistema de Sellado (Bóveda) -- //
 workspaceRouter.get('/seal', authMiddleware, async (req: Request, res: Response): Promise<void> => {
+  let project: ProjectName;
   try {
-     const projectName = req.query.projectName as string;
-     if(!projectName || !/^[a-zA-Z0-9_-]+$/.test(projectName)) { res.status(400).json({error: 'projectName faltante o inválido'}); return; }
-     const sealPath = path.join(DEFAULT_WORKSPACES_DIR, projectName, '.sdd-sealed');
-     try {
-        await fs.access(sealPath);
-        res.status(200).json({ isSealed: true });
-     } catch {
-        res.status(200).json({ isSealed: false });
-     }
-  } catch(e) {
-     res.status(500).json({ error: 'Error leyendo sellado' });
+    project = ProjectName.from(req.query.projectName);
+  } catch (e) {
+    res.status(400).json({ error: (e as Error).message });
+    return;
+  }
+  const sealPath = path.join(env().workspacesDir, project.value, '.sdd-sealed');
+  try {
+    await fs.access(sealPath);
+    res.status(200).json({ isSealed: true });
+  } catch {
+    res.status(200).json({ isSealed: false });
   }
 });
 
 workspaceRouter.post('/seal', authMiddleware, architectOnly, async (req: Request, res: Response): Promise<void> => {
+  let project: ProjectName;
   try {
-     const { projectName } = req.body;
-     if(!projectName || !/^[a-zA-Z0-9_-]+$/.test(projectName)) { res.status(400).json({error: 'projectName faltante o inválido'}); return; }
-     const sealPath = path.join(DEFAULT_WORKSPACES_DIR, projectName, '.sdd-sealed');
-     await fs.writeFile(sealPath, 'SEALED', 'utf8');
-     res.status(200).json({ message: 'Proyecto sellado con éxito' });
-  } catch(e) {
-     res.status(500).json({ error: 'Error al sellar' });
+    project = ProjectName.from(req.body?.projectName);
+  } catch (e) {
+    res.status(400).json({ error: (e as Error).message });
+    return;
+  }
+  try {
+    const sealPath = path.join(env().workspacesDir, project.value, '.sdd-sealed');
+    await fs.writeFile(sealPath, 'SEALED', 'utf8');
+    res.status(200).json({ message: 'Proyecto sellado con éxito' });
+  } catch {
+    res.status(500).json({ error: 'Error al sellar' });
   }
 });
 
 workspaceRouter.delete('/seal/:projectName', authMiddleware, architectOnly, async (req: Request, res: Response): Promise<void> => {
+  let project: ProjectName;
   try {
-     const projectName = req.params.projectName as string;
-     if(!projectName || !/^[a-zA-Z0-9_-]+$/.test(projectName)) { res.status(400).json({error: 'projectName faltante o inválido'}); return; }
-     const sealPath = path.join(DEFAULT_WORKSPACES_DIR, projectName, '.sdd-sealed');
-     await fs.unlink(sealPath);
-     res.status(200).json({ message: 'Candado removido' });
-  } catch(e) {
-     res.status(200).json({ message: 'Candado deshecho (o inexistente)' });
+    project = ProjectName.from(req.params.projectName);
+  } catch (e) {
+    res.status(400).json({ error: (e as Error).message });
+    return;
   }
+  try {
+    await fs.unlink(path.join(env().workspacesDir, project.value, '.sdd-sealed'));
+  } catch {}
+  res.status(200).json({ message: 'Candado deshecho (o inexistente)' });
 });
 
 workspaceRouter.post('/artifact', authMiddleware, architectOnly, async (req: Request, res: Response): Promise<void> => {
+  let parsed: z.infer<typeof SaveArtifactSchema>;
   try {
-    const parsed = SaveArtifactSchema.parse(req.body);
-    const { saveArtifactUseCase } = getUseCasesForProject(parsed.projectName);
-    await saveArtifactUseCase.execute(parsed.relativePath, parsed.content);
-
-    res.status(200).json({ message: 'Artefacto guardado con éxito' });
-  } catch (err: unknown) {
+    parsed = SaveArtifactSchema.parse(req.body);
+  } catch (err) {
     if (err instanceof z.ZodError) {
-       res.status(400).json({ error: 'Validación fallida LFI interceptado', details: err.issues });
-       return;
+      res.status(400).json({ error: 'Validación fallida', details: err.issues });
+      return;
     }
+    res.status(400).json({ error: 'Validación fallida' });
+    return;
+  }
+  let project: ProjectName;
+  let resolved: ResolvedArtifactPath;
+  try {
+    project = ProjectName.from(parsed.projectName);
+    resolved = ResolvedArtifactPath.from(env().workspacesDir, project, parsed.relativePath);
+  } catch (e) {
+    res.status(400).json({ error: (e as Error).message });
+    return;
+  }
+  try {
+    const { saveArtifactUseCase } = getUseCasesForProject(project);
+    await saveArtifactUseCase.execute(resolved.relativePath, parsed.content);
+    res.status(200).json({ message: 'Artefacto guardado con éxito' });
+  } catch (err) {
     const e = err as Error;
     res.status(500).json({ error: 'Error del servidor', details: e.message });
   }
 });
 
-workspaceRouter.get('/download/:projectName', authMiddleware, async (req: Request, res: Response): Promise<void> => {
-  try {
-     const projectName = req.params.projectName as string;
-     if(!projectName || !/^[a-zA-Z0-9_-]+$/.test(projectName)) { res.status(400).json({error: 'projectName faltante o inválido'}); return; }
-     const projectPath = path.join(DEFAULT_WORKSPACES_DIR, projectName);
-
-     try {
-       await fs.access(projectPath);
-     } catch (err) {
-       res.status(404).json({ error: 'Proyecto no encontrado' });
-       return;
-     }
-
-     res.setHeader('Content-Type', 'application/zip');
-     res.setHeader('Content-Disposition', `attachment; filename=${projectName}-sdd-architecture.zip`);
-
-     const archive = archiver('zip', { zlib: { level: 9 } });
-
-     archive.on('error', function(err) {
-       if (!res.headersSent) res.status(500).end();
-     });
-
-     archive.pipe(res);
-     archive.directory(projectPath, false);
-     await archive.finalize();
-
-  } catch(e) {
-     if (!res.headersSent) res.status(500).json({ error: 'Error interno generando ZIP' });
-  }
-});
-
 workspaceRouter.get('/artifact', authMiddleware, async (req: Request, res: Response): Promise<void> => {
+  let project: ProjectName;
+  let resolved: ResolvedArtifactPath;
   try {
-    const relativePath = req.query.relativePath as string;
-    const projectName = req.query.projectName as string;
-    if (!relativePath || !projectName) {
-      res.status(400).json({ error: 'Faltan parámetros relativePath o projectName' });
-      return;
-    }
-    if(!/^[a-zA-Z0-9_-]+$/.test(projectName) || relativePath.includes('..')) { res.status(400).json({error: 'Validación LFI fallida'}); return; }
-
-    const { readArtifactUseCase } = getUseCasesForProject(projectName);
-    const content = await readArtifactUseCase.execute(relativePath);
+    project = ProjectName.from(req.query.projectName);
+    resolved = ResolvedArtifactPath.from(env().workspacesDir, project, req.query.relativePath);
+  } catch (e) {
+    res.status(400).json({ error: (e as Error).message });
+    return;
+  }
+  try {
+    const { readArtifactUseCase } = getUseCasesForProject(project);
+    const content = await readArtifactUseCase.execute(resolved.relativePath);
     if (content === null) {
       res.status(404).json({ error: 'Artefacto no encontrado' });
       return;
     }
     res.status(200).send(content);
-  } catch (err: any) {
+  } catch {
     res.status(500).json({ error: 'Error interno leyendo' });
   }
 });
 
-let activeAiModel = 'gemini-1.5-flash';
+workspaceRouter.post('/download-ticket', authMiddleware, async (req: Request, res: Response): Promise<void> => {
+  let project: ProjectName;
+  try {
+    project = ProjectName.from(req.body?.projectName);
+  } catch (e) {
+    res.status(400).json({ error: (e as Error).message });
+    return;
+  }
+  try {
+    await fs.access(path.join(env().workspacesDir, project.value));
+  } catch {
+    res.status(404).json({ error: 'Proyecto no encontrado' });
+    return;
+  }
+  const user = (req as any).user;
+  const ticket = getTicketStore().issue({ projectName: project.value, username: user.username });
+  res.status(200).json({ ticket, expiresInSeconds: 30 });
+});
 
-// AI Status no necesita token
-workspaceRouter.get('/ai-status', async (req: Request, res: Response): Promise<void> => {
-  res.status(200).json({ 
+workspaceRouter.get('/download/:projectName', async (req: Request, res: Response): Promise<void> => {
+  let project: ProjectName;
+  try {
+    project = ProjectName.from(req.params.projectName);
+  } catch (e) {
+    res.status(400).json({ error: (e as Error).message });
+    return;
+  }
+  const ticket = req.query.ticket as string | undefined;
+  if (!ticket) {
+    res.status(401).json({ error: 'Ticket de descarga requerido' });
+    return;
+  }
+  try {
+    getTicketStore().consume(ticket, project.value);
+  } catch (e) {
+    res.status(401).json({ error: (e as Error).message });
+    return;
+  }
+
+  const projectPath = path.join(env().workspacesDir, project.value);
+  try {
+    await fs.access(projectPath);
+  } catch {
+    res.status(404).json({ error: 'Proyecto no encontrado' });
+    return;
+  }
+  res.setHeader('Content-Type', 'application/zip');
+  res.setHeader('Content-Disposition', `attachment; filename=${project.value}-sdd-architecture.zip`);
+  const archive = archiver('zip', { zlib: { level: 9 } });
+  archive.on('error', () => { if (!res.headersSent) res.status(500).end(); });
+  archive.pipe(res);
+  archive.directory(projectPath, false);
+  await archive.finalize();
+});
+
+workspaceRouter.get('/ai-status', (_req: Request, res: Response): void => {
+  const keys = env().aiKeys;
+  res.status(200).json({
     serverHasKey: {
-      gemini: !!process.env.GEMINI_API_KEY,
-      openai: !!process.env.OPENAI_API_KEY,
-      anthropic: !!process.env.ANTHROPIC_API_KEY
+      gemini: !!keys.gemini,
+      openai: !!keys.openai,
+      anthropic: !!keys.anthropic
     }
   });
 });
 
+let activeAiModel = 'gemini-1.5-flash';
+
 workspaceRouter.post('/ai-draft', authMiddleware, architectOnly, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { apiKey, provider, systemPrompt, userPrompt } = req.body;
+    const { apiKey, provider, systemPrompt, userPrompt } = req.body ?? {};
     const aiProvider = provider || 'gemini';
-    
-    let envKey = '';
-    if (aiProvider === 'gemini') envKey = process.env.GEMINI_API_KEY || '';
-    if (aiProvider === 'openai') envKey = process.env.OPENAI_API_KEY || '';
-    if (aiProvider === 'anthropic') envKey = process.env.ANTHROPIC_API_KEY || '';
-    
+    const serverKeys = env().aiKeys;
+    const envKey =
+      aiProvider === 'gemini' ? serverKeys.gemini :
+      aiProvider === 'openai' ? serverKeys.openai :
+      aiProvider === 'anthropic' ? serverKeys.anthropic : undefined;
+
     const finalApiKey = envKey || apiKey;
     if (!finalApiKey) {
-       res.status(400).json({ error: `La llave de API del proveedor ${aiProvider.toUpperCase()} es obligatoria. Verifícala en tu Archivo de Servidor o Bóveda.` });
-       return;
+      res.status(400).json({ error: `La llave de API del proveedor ${String(aiProvider).toUpperCase()} es obligatoria.` });
+      return;
     }
+    const cleanedKey = String(finalApiKey).trim();
 
-    const cleanedKey = finalApiKey.trim();
-    
-    // --- OPENAI DISPATCHER ---
     if (aiProvider === 'openai') {
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${cleanedKey}` },
-            body: JSON.stringify({
-                model: 'gpt-4o',
-                messages: [
-                    { role: 'system', content: systemPrompt },
-                    { role: 'user', content: userPrompt }
-                ]
-            })
-        });
-        const data = await response.json();
-        if (!response.ok) { res.status(response.status).json(data); return; }
-        res.status(200).json({ text: data.choices?.[0]?.message?.content || '' });
-        return;
+      const r = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${cleanedKey}` },
+        body: JSON.stringify({
+          model: 'gpt-4o',
+          messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }]
+        })
+      });
+      const data = await r.json();
+      if (!r.ok) { res.status(r.status).json(data); return; }
+      res.status(200).json({ text: data.choices?.[0]?.message?.content || '' });
+      return;
     }
 
-    // --- ANTHROPIC DISPATCHER ---
     if (aiProvider === 'anthropic') {
-        const response = await fetch('https://api.anthropic.com/v1/messages', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'x-api-key': cleanedKey,
-                'anthropic-version': '2023-06-01'
-            },
-            body: JSON.stringify({
-                model: 'claude-3-5-sonnet-latest', // Resiliente a deprecaciones de fecha
-                max_tokens: 4096,
-                system: systemPrompt,
-                messages: [ { role: 'user', content: userPrompt } ]
-            })
-        });
-        const data = await response.json();
-        if (!response.ok) { res.status(response.status).json(data); return; }
-        res.status(200).json({ text: data.content?.[0]?.text || '' });
-        return;
+      const r = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': cleanedKey, 'anthropic-version': '2023-06-01' },
+        body: JSON.stringify({
+          model: 'claude-3-5-sonnet-latest',
+          max_tokens: 4096,
+          system: systemPrompt,
+          messages: [{ role: 'user', content: userPrompt }]
+        })
+      });
+      const data = await r.json();
+      if (!r.ok) { res.status(r.status).json(data); return; }
+      res.status(200).json({ text: data.content?.[0]?.text || '' });
+      return;
     }
 
-    // --- GEMINI DISPATCHER (Default) ---
-    const callGenerate = async (model: string) => {
-      return await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${cleanedKey}`, {
+    const callGenerate = async (model: string) =>
+      fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${cleanedKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ role: 'user', parts: [{ text: `Sistema: ${systemPrompt}\nRequerimiento: ${userPrompt}` }] }]
         })
       });
-    };
 
     let response = await callGenerate(activeAiModel);
-
     if (response.status === 404) {
       const listReq = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${cleanedKey}`);
       if (listReq.ok) {
-         const listData = await listReq.json();
-         const validFallback = (listData.models || []).find((m: any) => 
-           m.name.includes("gemini") && m.supportedGenerationMethods?.includes("generateContent")
-         );
-         if (validFallback) {
-            activeAiModel = validFallback.name.replace('models/', '');
-            response = await callGenerate(activeAiModel);
-         }
+        const listData = await listReq.json();
+        const fallback = (listData.models || []).find((m: any) =>
+          m.name.includes('gemini') && m.supportedGenerationMethods?.includes('generateContent'));
+        if (fallback) {
+          activeAiModel = fallback.name.replace('models/', '');
+          response = await callGenerate(activeAiModel);
+        }
       }
     }
-
     const textData = await response.text();
     let data;
-    try { data = JSON.parse(textData); } catch(e) { data = { error: { message: "Error in-parseable de Gemini: " + textData.substring(0, 100) } }; }
-    
-    if (!response.ok) {
-       res.status(response.status).json(data);
-       return;
-    }
-
-    const outputText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    res.status(200).json({ text: outputText });
-  } catch (err: any) {
-    res.status(500).json({ error: 'Fallo fatal en proxy remoto inteligente', details: err.message });
+    try { data = JSON.parse(textData); } catch { data = { error: { message: 'Respuesta no parseable de Gemini' } }; }
+    if (!response.ok) { res.status(response.status).json(data); return; }
+    res.status(200).json({ text: data.candidates?.[0]?.content?.parts?.[0]?.text || '' });
+  } catch (err) {
+    const e = err as Error;
+    res.status(500).json({ error: 'Fallo en proxy de IA', details: e.message });
   }
 });
