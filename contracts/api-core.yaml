@@ -1,9 +1,404 @@
-﻿# contracts/api-core.yaml
-openapi: 3.0.0
+openapi: 3.0.3
 info:
-  title: SDD Framework API
-  version: 1.0.0
+  title: SDD-TDD Framework Orchestrator API
+  description: |
+    Backend del framework SDD-TDD. Persiste artefactos por proyecto, autentica por
+    rol (ARCHITECT / DEVELOPER), sella proyectos cuando el diseño está validado, y
+    orquesta drafting con IA (Gemini, OpenAI, Anthropic).
+
+    Esta especificación es la única fuente de verdad. El comando `npm run spec:check`
+    valida que cada endpoint declarado aquí exista en el código y viceversa. Si hay
+    drift, el CI falla.
+  version: 2.0.0
+servers:
+  - url: http://localhost:3000
+    description: Servidor local de desarrollo
+
+tags:
+  - name: health
+    description: Health checks
+  - name: auth
+    description: Autenticación
+  - name: projects
+    description: Gestión de proyectos SDD
+  - name: artifacts
+    description: Lectura/escritura de artefactos dentro de un proyecto
+  - name: sealing
+    description: Sellado/desellado de proyectos (bóveda)
+  - name: download
+    description: Descarga del proyecto como ZIP (flujo de ticket de un solo uso)
+  - name: ai
+    description: Proxy multi-proveedor de IA
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
+
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username: { type: string }
+        password: { type: string }
+
+    LoginResponse:
+      type: object
+      required: [status, token, user]
+      properties:
+        status: { type: string, enum: [ok] }
+        token: { type: string, description: JWT firmado con HS256 }
+        user:
+          type: object
+          required: [username, role]
+          properties:
+            username: { type: string }
+            role: { type: string, enum: [ARCHITECT, DEVELOPER] }
+
+    ProjectName:
+      type: string
+      pattern: '^[a-zA-Z0-9_-]{1,100}$'
+      description: 1-100 caracteres alfanuméricos, guiones y underscores
+
+    CreateProjectRequest:
+      type: object
+      required: [projectName]
+      properties:
+        projectName: { $ref: '#/components/schemas/ProjectName' }
+
+    SealStatusResponse:
+      type: object
+      required: [isSealed]
+      properties:
+        isSealed: { type: boolean }
+
+    SaveArtifactRequest:
+      type: object
+      required: [projectName, relativePath, content]
+      properties:
+        projectName: { $ref: '#/components/schemas/ProjectName' }
+        relativePath:
+          type: string
+          description: Path relativo dentro del proyecto. Rechaza `..`, paths absolutos, secuencias URL-encoded (%2e/%2f) y null bytes.
+        content: { type: string }
+
+    DownloadTicketRequest:
+      type: object
+      required: [projectName]
+      properties:
+        projectName: { $ref: '#/components/schemas/ProjectName' }
+
+    DownloadTicketResponse:
+      type: object
+      required: [ticket, expiresInSeconds]
+      properties:
+        ticket: { type: string, description: Token HMAC-SHA256 de un solo uso }
+        expiresInSeconds: { type: integer, example: 30 }
+
+    AiStatusResponse:
+      type: object
+      required: [serverHasKey]
+      properties:
+        serverHasKey:
+          type: object
+          required: [gemini, openai, anthropic]
+          properties:
+            gemini: { type: boolean }
+            openai: { type: boolean }
+            anthropic: { type: boolean }
+
+    AiDraftRequest:
+      type: object
+      required: [systemPrompt, userPrompt]
+      properties:
+        provider:
+          type: string
+          enum: [gemini, openai, anthropic]
+          default: gemini
+        apiKey:
+          type: string
+          description: Llave del proveedor; opcional si el server tiene la suya en env.
+        systemPrompt: { type: string }
+        userPrompt: { type: string }
+
+    AiDraftResponse:
+      type: object
+      required: [text]
+      properties:
+        text: { type: string }
+
+  responses:
+    Unauthorized:
+      description: Token faltante, inválido o expirado
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Forbidden:
+      description: Rol insuficiente (típicamente requiere ARCHITECT)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    BadRequest:
+      description: Validación fallida (incluye path traversal detectado)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: Recurso no encontrado
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
 paths:
-  /specs:
+  /:
     get:
-      summary: Lista todas las especificaciones validadas[cite: 216].
+      tags: [health]
+      summary: Health check
+      responses:
+        '200':
+          description: Servicio operativo
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name: { type: string }
+                  status: { type: string }
+                  version: { type: string }
+                  env: { type: string }
+
+  /api/auth/login:
+    post:
+      tags: [auth]
+      summary: Autenticación por usuario/contraseña; emite JWT (8h)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+      responses:
+        '200':
+          description: Credenciales válidas
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LoginResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/workspace/projects:
+    get:
+      tags: [projects]
+      summary: Lista los proyectos del workspace
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [projects]
+                properties:
+                  projects:
+                    type: array
+                    items: { type: string }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [projects]
+      summary: Crea un proyecto nuevo y siembra las 10 plantillas de documentación
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateProjectRequest' }
+      responses:
+        '200':
+          description: Proyecto creado
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          description: El proyecto ya existe
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/workspace/seal:
+    get:
+      tags: [sealing]
+      summary: Consulta si un proyecto está sellado
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: projectName
+          in: query
+          required: true
+          schema: { $ref: '#/components/schemas/ProjectName' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SealStatusResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [sealing]
+      summary: Sella un proyecto (bloquea edición)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateProjectRequest' }
+      responses:
+        '200':
+          description: Proyecto sellado
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/workspace/seal/{projectName}:
+    delete:
+      tags: [sealing]
+      summary: Quita el sello (operación idempotente)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: projectName
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ProjectName' }
+      responses:
+        '200':
+          description: Candado deshecho (o inexistente)
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/workspace/artifact:
+    get:
+      tags: [artifacts]
+      summary: Lee un artefacto del proyecto
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: projectName
+          in: query
+          required: true
+          schema: { $ref: '#/components/schemas/ProjectName' }
+        - name: relativePath
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Contenido del artefacto (texto)
+          content:
+            text/plain: { schema: { type: string } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      tags: [artifacts]
+      summary: Crea o sobrescribe un artefacto del proyecto
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SaveArtifactRequest' }
+      responses:
+        '200':
+          description: Artefacto guardado
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/workspace/download-ticket:
+    post:
+      tags: [download]
+      summary: Emite un ticket HMAC de un solo uso (TTL 30s) para descargar el ZIP
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DownloadTicketRequest' }
+      responses:
+        '200':
+          description: Ticket emitido
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DownloadTicketResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/workspace/download/{projectName}:
+    get:
+      tags: [download]
+      summary: Descarga el proyecto como ZIP (consume un ticket de un solo uso)
+      description: |
+        Este endpoint **no** acepta el JWT principal. Requiere un ticket emitido por
+        `/download-ticket`. El ticket se invalida tras un uso.
+      parameters:
+        - name: projectName
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ProjectName' }
+        - name: ticket
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: ZIP del proyecto
+          content:
+            application/zip:
+              schema: { type: string, format: binary }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401':
+          description: Ticket faltante, inválido, consumido o expirado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/workspace/ai-status:
+    get:
+      tags: [ai]
+      summary: Indica qué proveedores de IA tienen llave configurada en el servidor
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AiStatusResponse' }
+
+  /api/workspace/ai-draft:
+    post:
+      tags: [ai]
+      summary: Drafting con un proveedor de IA (gemini default, openai o anthropic)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AiDraftRequest' }
+      responses:
+        '200':
+          description: Borrador generado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AiDraftResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
