@@ -2,6 +2,13 @@
   "compilerOptions": {
     "target": "ESNext",
     "module": "NodeNext",
-    "strict": true
-  }
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "allowImportingTsExtensions": false
+  },
+  "include": ["src/**/*.ts", "scripts/**/*.ts"],
+  "exclude": ["node_modules", "workspaces", "sdd-frontend", "dist", "coverage"]
 }

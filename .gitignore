@@ -6,9 +6,15 @@ coverage/
 dist/
 
 # Archivos de Entorno y Sistema Operativo
-.env*
+.env
+.env.local
+.env.*.local
+!.env.example
 .DS_Store
 Thumbs.db
+
+# Backup generado por el script migrate-users
+users.json.bak
 
 # Persistencia Oculta (Workspaces SDD)
 workspaces/

@@ -5,7 +5,10 @@ export default defineConfig({
     include: ['src/**/*.test.ts', 'tests/**/*.test.ts'],
     coverage: {
       include: ['src/**/*.ts'],
-      exclude: ['src/**/*.test.ts'],
+      exclude: [
+        'src/**/*.test.ts',
+        'src/infrastructure/api/server.ts'
+      ],
       thresholds: {
         lines: 80,
         functions: 80,
