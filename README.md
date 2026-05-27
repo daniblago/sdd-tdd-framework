@@ -49,18 +49,56 @@ Documentación: Markdown + Mermaid (Diagrams as Code)
 
 Instalación
 
+```bash
 npm install
+cp .env.example .env   # editar y rellenar JWT_SECRET
+```
 
+Levantar API + UI
+
+```bash
+npm run dev
+```
 
 Ejecutar Tests (TDD)
 
+```bash
 npm test
-
+```
 
 Generar Cobertura
 
+```bash
 npm run test:coverage
+```
 
+Migrar `users.json` con contraseñas en texto plano a hashes bcrypt (idempotente, crea `.bak`)
+
+```bash
+npm run users:migrate
+```
+
+🔐 Seguridad
+
+El framework aplica las siguientes garantías (ver [ADR-004](docs/adr/ADR-004-seguridad-fase-1.md) y [CHANGELOG](CHANGELOG.md)):
+
+* **Configuración por entorno con validación al boot.** `JWT_SECRET` es **obligatorio** en `NODE_ENV=production` (mínimo 32 caracteres). En desarrollo se genera un secreto efímero en memoria con warning. Toda la config vive en [src/infrastructure/config/env.ts](src/infrastructure/config/env.ts) y se valida con Zod.
+* **Contraseñas con bcrypt** (cost configurable 10–14, default 12). Los usuarios por defecto se hashean al sembrar `users.json`. Si tu `users.json` venía con texto plano, corre `npm run users:migrate` una vez.
+* **Descargas con ticket de un solo uso.** El JWT no viaja en query string. Se solicita primero un ticket HMAC-SHA256 (TTL 30s) vía `POST /api/workspace/download-ticket`, y luego se navega a `GET /api/workspace/download/:project?ticket=...`. El ticket caduca en 30s y solo es válido una vez.
+* **Anti path traversal centralizado.** Los Value Objects `ProjectName` y `ResolvedArtifactPath` en [src/domain/ProjectPath.ts](src/domain/ProjectPath.ts) rechazan `..`, paths absolutos (POSIX y Windows), secuencias URL-encoded y null bytes. Cross-platform.
+* **RBAC.** `architectOnly` middleware bloquea operaciones de escritura para el rol `DEVELOPER`.
+
+> ⚠️ **Antes de exponer este entorno**, cambia las contraseñas por defecto (`admin/architect123`, `dev/dev123`) editando `users.json` o usando el script de migración con tus propios usuarios.
+
+🧪 Cobertura actual
+
+```
+Statements   : 87.36%
+Branches     : 82.15%
+Functions    : 93.18%
+Lines        : 89.24%
+112 tests / 16 archivos
+```
 
 🤖 Uso con Agentes de IA
 
