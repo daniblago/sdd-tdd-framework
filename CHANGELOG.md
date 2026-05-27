@@ -3,6 +3,45 @@
 Todos los cambios notables a este proyecto se documentan aquí.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/) y el versionado [SemVer](https://semver.org/).
 
+## [Unreleased] — Fase 3 del refactor: SDD Enforcement — el contrato es ejecutable
+
+Ver [ADR-006](docs/adr/ADR-006-sdd-enforcement.md) para la justificación completa.
+
+### Added
+- `src/contract/ContractExtractor.ts` — lee `api-core.yaml` (js-yaml) y devuelve
+  la lista canónica `"METHOD path"`.
+- `src/contract/RouterIntrospector.ts` — camina la stack de los `Router` de Express
+  recibidos como mounts explícitos y devuelve la misma lista canónica. Normaliza
+  `:projectName` → `{projectName}` para alinear con OpenAPI.
+- `src/contract/SpecChecker.ts` — compara las dos listas y formatea el reporte de
+  drift (qué endpoint sobra/falta de cada lado).
+- `scripts/spec-check.ts` — script CLI `npm run spec:check`. Compone la app
+  Express real (sin escuchar puerto), corre los tres componentes, termina con
+  `exit(1)` si hay drift.
+- `.github/workflows/ci.yml` — pipeline bloqueante: `tsc --noEmit` →
+  `npm run test:coverage` (umbral 80%) → `npm run spec:check`. En cada push/PR a
+  main. `JWT_SECRET` inyectado como variable de job (no secret real).
+- `docs/adr/ADR-006-sdd-enforcement.md` — decisión, alternativas, deuda.
+- 17 tests TDD para los componentes del extractor (4 + 6 + 7).
+- Dependencias: `js-yaml`, `@types/js-yaml`.
+
+### Changed
+- `specs/001-framework-core/spec.md` — reescrito de placeholder a spec ejecutiva
+  orientada a contratos: roles, reglas transversales (auth, path traversal,
+  descarga de ZIP en dos pasos), enumeración de endpoints con restricciones de rol,
+  criterios de aceptación verificables.
+- `contracts/api-core.yaml` — reescrito de stub de un endpoint inexistente a
+  OpenAPI 3.0.3 completo: 13 paths, `bearerAuth`, schemas reutilizables, tags por
+  dominio, todos los status codes (incluye el 409 de Fase 2 y el 401 del flujo de
+  ticket).
+- `package.json` — nuevo script `spec:check`.
+- `README.md` — sección SDD Enforcement con el flujo y los comandos.
+
+### Tests
+- Suite: 176 tests pasando (29 archivos), +17 sobre Fase 2.
+- Cobertura: igual o mejor que Fase 2 (los componentes nuevos están al 100%).
+- Smoke en runtime: `npm run spec:check` → "13 endpoints alineados entre spec y código".
+
 ## [Unreleased] — Fase 2 del refactor: Split del WorkspaceRouter + puerto AiProvider
 
 Ver [ADR-005](docs/adr/ADR-005-split-workspace-router.md) para la justificación completa.

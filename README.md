@@ -78,6 +78,29 @@ Migrar `users.json` con contraseñas en texto plano a hashes bcrypt (idempotente
 npm run users:migrate
 ```
 
+Validar que el código y el contrato OpenAPI no han driftado (CI lo corre en cada PR)
+
+```bash
+npm run spec:check
+```
+
+📐 SDD Enforcement
+
+La promesa del [AGENT.md](AGENT.md) y de la [spec](specs/001-framework-core/spec.md) — *"el código es reflejo exacto de la spec"* — ahora se enforces:
+
+* **`contracts/api-core.yaml`** es la única fuente de verdad del contrato HTTP (OpenAPI 3.0.3, 13 paths).
+* **`npm run spec:check`** compara la lista de endpoints del OpenAPI contra los que el código realmente registra en Express. Si sobra o falta alguno en cualquier dirección, falla con un reporte tipo:
+
+  ```
+  ✗ SPEC DRIFT DETECTADO
+    Spec declara 12 endpoints; código implementa 13.
+    En spec pero NO en código (1): GET /api/workspace/fake
+    En código pero NO en spec (1): GET /api/workspace/seal
+  ```
+* **`.github/workflows/ci.yml`** corre el chequeo (más tsc + tests con cobertura ≥ 80%) en cada push/PR a `main`. Sin spec actualizada, no hay merge.
+
+Ver [ADR-006](docs/adr/ADR-006-sdd-enforcement.md) para los detalles arquitectónicos.
+
 🔐 Seguridad
 
 El framework aplica las siguientes garantías (ver [ADR-004](docs/adr/ADR-004-seguridad-fase-1.md) y [CHANGELOG](CHANGELOG.md)):
@@ -93,11 +116,11 @@ El framework aplica las siguientes garantías (ver [ADR-004](docs/adr/ADR-004-se
 🧪 Cobertura actual
 
 ```
-Statements   : 90.95%
-Branches     : 83.79%
-Functions    : 98.44%
-Lines        : 92.96%
-159 tests / 26 archivos
+Statements   : 91.43%
+Branches     : 83.09%
+Functions    : 98.55%
+Lines        : 93.58%
+176 tests / 29 archivos
 ```
 
 🏗️ Arquitectura
