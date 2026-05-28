@@ -37,6 +37,18 @@ El framework no te obliga a ejecutar las 10 fases de forma secuencial todos los 
 
 > **Regla Inquebrantable:** NUNCA pases al Micro-Ciclo (Escribir Código) sin tener validado el Macro-Ciclo (Especificación de Diseño).
 
+### ✅ Quality Gates (Puntos de Control)
+
+Inspiradas en [GitHub Spec-Kit](https://github.com/github/spec-kit) (`clarify` / `checklist` / `analyze`) e integradas dentro de las fases existentes para no romper el flujo de 10. Cada proyecto nuevo se siembra con estas secciones ya incluidas en sus plantillas:
+
+| Gate | Vive al final de | Bloquea el avance a | Qué valida |
+|------|------------------|---------------------|------------|
+| **Clarify** | Fase 3 (Especificación Funcional) | Fase 4 | Cero ambigüedades abiertas en la spec antes de diseñar |
+| **Checklist** | Fase 8 (Plan Técnico) | Fase 9 | El plan cumple criterios de testing, seguridad, observabilidad, performance |
+| **Analyze** | Fase 9 (Backlog TDD) | Fase 10 | Trazabilidad spec ↔ plan ↔ tasks (sin criterios ni módulos huérfanos) |
+
+> Este framework comparte filosofía con **GitHub Spec-Kit** (Spec-Driven Development), pero añade orquestación de equipo: UI multi-proyecto, RBAC, sellado de bóveda, drift enforcement automático y proxy multi-IA. Ver [ADR-007](docs/adr/ADR-007-quality-gates-spec-kit.md).
+
 🛠️ Stack Tecnológico
 
 Lenguaje: TypeScript (NodeNext)

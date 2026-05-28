@@ -3,6 +3,27 @@
 Todos los cambios notables a este proyecto se documentan aquí.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/) y el versionado [SemVer](https://semver.org/).
 
+## [Unreleased] — Fase 4: Quality Gates (inspiradas en GitHub Spec-Kit)
+
+Ver [ADR-007](docs/adr/ADR-007-quality-gates-spec-kit.md) para la justificación completa.
+
+### Added
+- Quality Gates integradas en las plantillas de fase (en `src/domain/ProjectTemplates.ts`):
+  - **Clarify** al final de la Fase 3 — tabla de ambigüedades a resolver antes de Fase 4.
+  - **Checklist** al final de la Fase 8 — 8 criterios de calidad del plan antes de Fase 9.
+  - **Analyze** al final de la Fase 9 — trazabilidad spec ↔ plan ↔ tasks antes de Fase 10.
+- `AGENT.md` — sección "Quality Gates" que obliga al agente IA a respetar los tres puntos
+  de control.
+- `docs/adr/ADR-007-quality-gates-spec-kit.md` — decisión, comparativa con Spec-Kit, deuda.
+
+### Changed
+- `README.md` — tabla de Quality Gates + nota de posicionamiento respecto a GitHub Spec-Kit.
+
+### Notes
+- Cero cambios de contrato HTTP: `npm run spec:check` sigue verde, 176 tests siguen pasando.
+- Las gates aplican a proyectos nuevos; los existentes no se migran automáticamente
+  (sobrescribir artefactos del usuario sería destructivo).
+
 ## [Unreleased] — Fase 3 del refactor: SDD Enforcement — el contrato es ejecutable
 
 Ver [ADR-006](docs/adr/ADR-006-sdd-enforcement.md) para la justificación completa.
