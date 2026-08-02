@@ -3,6 +3,56 @@
 Todos los cambios notables a este proyecto se documentan aquí.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/) y el versionado [SemVer](https://semver.org/).
 
+## [Unreleased] — Fase 0 (Brief de Requerimientos) + aprobación explícita de fases
+
+Ver [ADR-008](docs/adr/ADR-008-fase-0-requerimientos.md) para la justificación completa.
+
+### Added
+- **Fase 0 — Brief de Requerimientos.** Nueva plantilla `00-requerimientos.md` sembrada
+  en cada proyecto nuevo. La ruta de trabajo pasa de 10 a 11 fases (0 a 10) y el
+  Macro-Ciclo de "Fases 1 a 8" a "Fases 0 a 8". Cambio aditivo: las fases 1-10 conservan
+  numeración, nombres de archivo y significado.
+- **Aprobación explícita de fases.** El estado "completada" deja de inferirse del largo
+  del texto (heurístico de >50 caracteres) y pasa a ser una decisión del arquitecto,
+  persistida en `approved-phases.json` por proyecto. La UI muestra un distintivo
+  "Aprobado" en la fase activa.
+- `docs/adr/ADR-008-fase-0-requerimientos.md` — decisión, alternativas y deuda asumida.
+
+### Changed
+- `phases.json`, `specs/001-framework-core/spec.md`, `contracts/api-core.yaml`,
+  `README.md`, `TUTORIAL.md` y `AGENT.md` — propagación del conteo de fases (10 → 11).
+- **Creación de proyecto sin `window.prompt`.** La barra lateral usa un input embebido
+  con confirmar/cancelar, y los errores del backend se muestran tal cual los reporta
+  (antes: mensaje genérico que ocultaba la causa, p. ej. el 409 de proyecto duplicado).
+
+### Fixed
+- **El proxy del frontend ya no hardcodea el puerto del API.** `sdd-frontend/vite.config.js`
+  lee `PORT` del `.env` de la raíz vía `loadEnv`, con fallback a 3000 (el mismo default de
+  `env.ts` y `.env.example`). Antes, un puerto fijo en el config divergía del que usaba el
+  server y dejaba la UI sin backend en cualquier clon con configuración distinta.
+
+### Notes
+- Cero cambios de contrato HTTP: `npm run spec:check` sigue verde (13 endpoints),
+  176 tests siguen pasando, cobertura 91.47%.
+- **`spec:check` no detecta drift de prosa.** El conteo de plantillas declarado en
+  `spec.md` y `api-core.yaml` no lo valida ningún gate automático; esta propagación fue
+  manual. Ver la deuda registrada en ADR-008.
+- Fase 0 aplica a proyectos nuevos; los existentes no se migran automáticamente.
+
+## [Unreleased] — Limpieza: purga de artefactos y dependencias sin uso
+
+### Removed
+- `workspaces/residentapp/` — 11 archivos que seguían trackeados pese a la regla
+  `workspaces/` en `.gitignore` (commiteados antes de que la regla existiera).
+- `fix-bom.js` — archivo vacío (0 bytes) remanente del commit `bc662fb`.
+- Dependencias sin referencias en la raíz: `create-vite` y `tailwindcss` (esta última ya
+  declarada donde se usa, en `sdd-frontend`).
+
+### Fixed
+- `lucide-react` movido de la raíz a `sdd-frontend/package.json`. Se resolvía por hoisting
+  desde el `node_modules` de la raíz, así que un clon limpio que instalara solo dentro de
+  `sdd-frontend/` obtenía un build roto.
+
 ## [Unreleased] — Fase 4: Quality Gates (inspiradas en GitHub Spec-Kit)
 
 Ver [ADR-007](docs/adr/ADR-007-quality-gates-spec-kit.md) para la justificación completa.

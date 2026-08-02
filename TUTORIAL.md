@@ -2,13 +2,13 @@
 
 La regla de oro de este framework es: **Prohibido el "Vibe Coding" (programar improvisando)**. Todo código de producción nace de una especificación y de una prueba que falla. 
 
-> 💡 **Aclaración clave:** Aunque el framework tiene 10 fases, no es un modelo en "cascada" rígido. El trabajo se divide en un **Macro-Ciclo** (Fases 1 a 8 para diseñar y especificar) que haces solo de vez en cuando, y un **Micro-Ciclo** (Fases 9 y 10 para programar haciendo TDD) que es tu bucle de trabajo diario.
+> 💡 **Aclaración clave:** Aunque el framework tiene 11 fases (0 a 10), no es un modelo en "cascada" rígido. El trabajo se divide en un **Macro-Ciclo** (Fases 0 a 8 para diseñar y especificar) que haces solo de vez en cuando, y un **Micro-Ciclo** (Fases 9 y 10 para programar haciendo TDD) que es tu bucle de trabajo diario.
 
 ---
 
 Sigue estos 4 pasos para construir una nueva entidad `User` (Usuario) que debe tener un correo electrónico y que pueda ser "verificada":
 
-## Paso 1: Diseño y Especificación (Fases 1 a 8 - SDD)
+## Paso 1: Diseño y Especificación (Fases 0 a 8 - SDD)
 Antes de tocar código, debemos definir qué vamos a construir.
 1. **Glosario (Fase 2):** Vas a `domain-glossary.md` y agregas la definición: *"Usuario: Persona registrada en el sistema, identificada por un correo."*
 2. **Especificación (Fase 3):** Vas a la carpeta de especificaciones (`specs/`) y escribes las reglas de negocio. Por ejemplo:

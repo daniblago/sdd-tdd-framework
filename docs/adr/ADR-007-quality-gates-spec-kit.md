@@ -79,3 +79,7 @@ de gates y una nota de posicionamiento respecto a Spec-Kit.
 
 - [GitHub Spec-Kit](https://github.com/github/spec-kit)
 - [ADR-006](ADR-006-sdd-enforcement.md) — el drift enforcement que ya valida el contrato.
+- [ADR-008](ADR-008-fase-0-requerimientos.md) — añade la Fase 0 y con ella pasa a 11
+  fases. No invalida la decisión de este ADR (las gates siguen viviendo dentro de las
+  plantillas existentes), pero sí matiza el argumento de "no añadir fases nuevas": aplica
+  a verificaciones sobre artefactos previos, no a un insumo del que todo lo demás depende.

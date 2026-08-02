@@ -82,6 +82,7 @@ Lista las tasks huérfanas (sin referencia):
 `;
 
 export const PROJECT_DOC_TEMPLATES: readonly ProjectTemplateFile[] = [
+  { filename: '00-requerimientos.md', content: '# 00. Brief de Requerimientos Iniciales\n\nDescribe el propósito del sistema, los requerimientos del negocio (qué se necesita) y los requisitos técnicos (cómo se necesita).' },
   { filename: '01-constitucion.md', content: '# 01. Constitución del Proyecto\n\nDefine los principios de gobernanza, calidad y arquitectura limpia.' },
   { filename: '02-glosario.md', content: '# 02. Glosario de Dominio\n\nLista de términos de negocio empresariales y sus definiciones (Lenguaje Ubicuo).' },
   { filename: '03-especificacion-funcional.md', content: PHASE_3_CONTENT },
