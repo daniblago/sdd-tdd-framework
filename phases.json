@@ -1,5 +1,11 @@
 [
   {
+    "id": 0,
+    "title": "0. Brief de Requerimientos",
+    "type": "macro",
+    "file": "docs/00-requerimientos.md"
+  },
+  {
     "id": 1,
     "title": "1. Constitución",
     "type": "macro",

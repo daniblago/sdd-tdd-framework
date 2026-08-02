@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 
 const PHASES = [
+  { id: 0, title: 'Requerimientos', icon: FileText, file: 'docs/00-requerimientos.md', que: 'El punto de partida del proyecto.', como: 'Define el propósito general (qué se necesita) y las restricciones técnicas (cómo se necesita).', paraQue: 'Darle el contexto de partida a la IA y al equipo técnico antes de tomar decisiones de arquitectura.' },
   { id: 1, title: 'Constitución', icon: Book, file: 'docs/01-constitucion.md', que: 'El documento fundacional de tu proyecto.', como: 'Define los principios de arquitectura limpia y reglas categóricas.', paraQue: 'Evitar que la IA alucine librerías donde no debe e instituir una ley inflexible.' },
   { id: 2, title: 'Glosario', icon: BookOpen, file: 'docs/02-glosario.md', que: 'El diccionario del Lenguaje Ubicuo (DDD).', como: 'Haz una lista de términos de negocio empresariales y defínelos.', paraQue: 'Eliminar ambigüedades idiomáticas. Si la UI and la DB no se entienden, el código colapsa.' },
   { id: 3, title: 'Especificación F.', icon: FileText, file: 'docs/03-especificacion-funcional.md', que: 'Tus Requisitos en Criterios de Aceptación.', como: 'Redacta escenarios funcionales con bloques (Dado que / Cuando / Entonces).', paraQue: 'Ser la Source of Truth funcional. Si no se documenta aquí, Antigravity no lo desarrolla.' },
@@ -21,6 +22,7 @@ const PHASES = [
 
 const getPromptsForPhase = (phaseId) => {
   const instructions = {
+    0: "Escribe una descripción clara y detallada de los requerimientos de la aplicación: el qué (funcionalidades y lógica de negocio) y el cómo (restricciones de base de datos, API, etc.).",
     1: "Escribe una constitución de arquitectura limpia (Markdown). TDD obligatorio.",
     2: "Extrae de la fase previa conceptos y redacta un glosario con formato tabla.",
     3: "Crea Criterios de Aceptación precisos en formato Gherkin (Given-When-Then).",
@@ -50,6 +52,9 @@ export default function App() {
   const [projectsList, setProjectsList] = useState([]);
   const [activeProject, setActiveProject] = useState(() => localStorage.getItem('sdd_active_project') || '');
   const [isProjectSealed, setIsProjectSealed] = useState(false);
+  const [showNewProjectInput, setShowNewProjectInput] = useState(false);
+  const [newProjectName, setNewProjectName] = useState('');
+  const [approvedPhases, setApprovedPhases] = useState([]);
   
   // Auth State
   const [currentUser, setCurrentUser] = useState(null);
@@ -96,10 +101,9 @@ export default function App() {
   }, [activeProject]);
 
   // Create Project Helper
-  const handleCreateProject = async () => {
-    const name = window.prompt("Introduce un identificador para el nuevo proyecto (sin espacios):");
-    if (!name?.trim()) return;
-    const sanitized = name.trim().replace(/[^a-z0-9_-]/gi, '-').toLowerCase();
+  const submitNewProject = async () => {
+    if (!newProjectName?.trim()) return;
+    const sanitized = newProjectName.trim().replace(/[^a-z0-9_-]/gi, '-').toLowerCase();
     
     try {
       const res = await apiFetch('/api/workspace/projects', {
@@ -110,8 +114,11 @@ export default function App() {
       if (res.ok) {
          setProjectsList(prev => prev.includes(sanitized) ? prev : [...prev, sanitized]);
          setActiveProject(sanitized);
+         setShowNewProjectInput(false);
+         setNewProjectName('');
       } else {
-         alert("Fallo creando el directorio del proyecto.");
+         const data = await res.json().catch(() => ({}));
+         alert(data.error || "Fallo creando el directorio del proyecto.");
       }
     } catch (e) {
       alert("Error de conexión al crear proyecto.");
@@ -128,6 +135,7 @@ export default function App() {
   useEffect(() => {
     setVfs({}); // Volver a cero al cambiar proyecto
     setIsProjectSealed(false);
+    setApprovedPhases([]);
     
     const fetchAllPhasesBackground = async () => {
       if (serverMode && activeProject) {
@@ -137,6 +145,17 @@ export default function App() {
           if (sealRes.ok) {
             const sealData = await sealRes.json();
             setIsProjectSealed(sealData.isSealed);
+          }
+        } catch(e) {}
+
+        // Consultar fases aprobadas
+        try {
+          const approvedRes = await apiFetch(`/api/workspace/artifact?relativePath=approved-phases.json&projectName=${encodeURIComponent(activeProject)}`);
+          if (approvedRes.ok) {
+            const list = await approvedRes.json();
+            if (Array.isArray(list)) {
+              setApprovedPhases(list);
+            }
           }
         } catch(e) {}
 
@@ -172,6 +191,10 @@ export default function App() {
     setIsSaving(true);
     let newVfsState = { ...vfs, [activePhase.file]: currentContent };
     
+    const updatedApproved = approvedPhases.includes(activePhase.id)
+      ? approvedPhases
+      : [...approvedPhases, activePhase.id];
+
     if (serverMode) {
       if (!activeProject) {
         alert("¡Alto arquitecto! Debes crear o seleccionar un Proyecto Activo en la barra lateral antes de persistir en tu disco físico.");
@@ -184,11 +207,17 @@ export default function App() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ projectName: activeProject, relativePath: activePhase.file, content: currentContent })
         });
+        await apiFetch('/api/workspace/artifact', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ projectName: activeProject, relativePath: 'approved-phases.json', content: JSON.stringify(updatedApproved) })
+        });
       } catch (error) {
         console.error('Error guardando proxy local', error);
       }
     } 
     
+    setApprovedPhases(updatedApproved);
     setVfs(newVfsState);
     setIsSaving(false);
     
@@ -268,10 +297,9 @@ export default function App() {
     setCopilotLoading(false);
   };
 
-  // Helper check completion (more than 50 chars)
+  // Helper check completion (approved explicitly by user)
   const isPhaseCompleted = (phase) => {
-    const text = vfs[phase.file] || '';
-    return text.trim().length > 50;
+    return approvedPhases.includes(phase.id);
   };
 
   const attemptLogin = async (e) => {
@@ -365,27 +393,52 @@ export default function App() {
         {/* Selector de Workspace */}
         <div className="px-5 py-4 border-b border-gray-100 dark:border-zinc-800/80 bg-gray-50/50 dark:bg-[#0c0c0e]/30 shrink-0">
            <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400 mb-2">Workspace Activo</div>
-           <div className="flex items-center gap-2">
-             <select 
-                value={activeProject}
-                onChange={(e) => setActiveProject(e.target.value)}
-                disabled={!serverMode}
-                className="flex-1 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 text-xs font-bold text-gray-700 dark:text-gray-200 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 appearance-none shadow-sm cursor-pointer"
-             >
-                <option value="" disabled>Selecciona...</option>
-                {projectsList.map(p => <option key={p} value={p}>{p}</option>)}
-             </select>
-             {!isDevMode && (
-               <button 
-                  onClick={handleCreateProject}
-                  disabled={!serverMode}
-                  className="px-3 py-2 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 font-bold rounded-lg border border-indigo-100 dark:border-indigo-500/20 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 disabled:opacity-50 transition-colors shadow-sm"
-                  title="Generar Nuevo Proyecto"
+           {showNewProjectInput ? (
+             <div className="flex items-center gap-2">
+               <input
+                 type="text"
+                 placeholder="Nombre de proyecto..."
+                 value={newProjectName}
+                 onChange={(e) => setNewProjectName(e.target.value)}
+                 className="flex-1 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 text-xs font-bold text-gray-700 dark:text-gray-200 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                 autoFocus
+               />
+               <button
+                 onClick={submitNewProject}
+                 className="px-2.5 py-2 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 font-bold rounded-lg border border-emerald-100 dark:border-emerald-500/20 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 transition-colors shadow-sm text-xs"
                >
-                  +
+                 OK
                </button>
-             )}
-           </div>
+               <button
+                 onClick={() => { setShowNewProjectInput(false); setNewProjectName(''); }}
+                 className="px-2.5 py-2 bg-red-50 dark:bg-red-500/10 text-red-700 dark:text-red-400 font-bold rounded-lg border border-red-100 dark:border-red-500/20 hover:bg-red-100 dark:hover:bg-red-500/20 transition-colors shadow-sm text-xs"
+               >
+                 X
+               </button>
+             </div>
+           ) : (
+             <div className="flex items-center gap-2">
+               <select 
+                  value={activeProject}
+                  onChange={(e) => setActiveProject(e.target.value)}
+                  disabled={!serverMode}
+                  className="flex-1 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 text-xs font-bold text-gray-700 dark:text-gray-200 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 appearance-none shadow-sm cursor-pointer"
+               >
+                  <option value="" disabled>Selecciona...</option>
+                  {projectsList.map(p => <option key={p} value={p}>{p}</option>)}
+               </select>
+               {!isDevMode && (
+                 <button 
+                    onClick={() => setShowNewProjectInput(true)}
+                    disabled={!serverMode}
+                    className="px-3 py-2 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 font-bold rounded-lg border border-indigo-100 dark:border-indigo-500/20 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 disabled:opacity-50 transition-colors shadow-sm"
+                    title="Generar Nuevo Proyecto"
+                  >
+                     +
+                  </button>
+                )}
+              </div>
+            )}
            {!serverMode && <p className="text-[10px] text-amber-600 dark:text-amber-500 mt-2 font-medium leading-tight">Activa el Disco Físico (abajo) para habilitar directorios aislados.</p>}
         </div>
 
@@ -530,8 +583,13 @@ export default function App() {
               <p className="text-[11px] font-extrabold tracking-[0.2em] uppercase text-indigo-600 dark:text-indigo-400 mb-2 font-mono flex items-center gap-2">
                  Fase {activePhase.id} <ArrowRight size={10}/> Documentación Activa
               </p>
-              <h2 className="text-4xl font-black text-gray-900 dark:text-white outfit-font tracking-tight mb-3">
+              <h2 className="text-4xl font-black text-gray-900 dark:text-white outfit-font tracking-tight mb-3 flex items-center gap-3">
                 {activePhase.title}
+                {isPhaseCompleted(activePhase) && (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-500/10 text-emerald-500 rounded-full border border-emerald-500/20 font-bold text-xs uppercase tracking-wide">
+                    <Check size={12} strokeWidth={3} /> Aprobado
+                  </span>
+                )}
               </h2>
               <div className="inline-flex items-center gap-2.5 px-3 py-1.5 bg-gray-100 dark:bg-zinc-900 rounded border border-gray-200 dark:border-zinc-800 text-gray-500 dark:text-gray-400 font-mono text-[11px] shadow-inner">
                 Single Source of Truth: <strong className="text-gray-900 dark:text-gray-200">{activePhase.file}</strong>

@@ -4,9 +4,11 @@ Framework de ingeniería de software de alto rendimiento basado en los paradigma
 
 🚀 Filosofía
 
-"Si los planos son sólidos, la construcción es ejecución controlada". Este framework elimina el Vibe Coding y la deuda técnica mediante una ruta de trabajo estricta de 10 fases, asegurando que cada línea de código tenga una razón de ser funcional y técnica.
+"Si los planos son sólidos, la construcción es ejecución controlada". Este framework elimina el Vibe Coding y la deuda técnica mediante una ruta de trabajo estricta de 11 fases, asegurando que cada línea de código tenga una razón de ser funcional y técnica.
 
-📂 Ruta de Trabajo de 10 Fases
+📂 Ruta de Trabajo de 11 Fases (0 a 10)
+
+Fase 0: Brief de Requerimientos: Punto de partida. El qué (funcionalidades y lógica de negocio) y el cómo (restricciones técnicas) antes de tomar decisiones de arquitectura.
 
 Fase 1: Constitución: Definición de leyes de gobernanza y arquitectura.
 
@@ -30,16 +32,16 @@ Fase 10: Construcción: Ciclo Red-Green-Refactor asistido por IA.
 
 ### 🔄 Cómo usar estas fases (No es Cascada)
 
-El framework no te obliga a ejecutar las 10 fases de forma secuencial todos los días. Se divide en dos mundos de trabajo:
+El framework no te obliga a ejecutar las 11 fases de forma secuencial todos los días. Se divide en dos mundos de trabajo:
 
-* **🌍 Mundo 1: El Macro-Ciclo (Fases 1 a 8 - Diseño y Arquitectura):** Se ejecuta al inicio del proyecto o cuando hay cambios estructurales (ej. definir una nueva funcionalidad, entidad o regla de negocio). Es planificación, no se hace a diario.
+* **🌍 Mundo 1: El Macro-Ciclo (Fases 0 a 8 - Diseño y Arquitectura):** Se ejecuta al inicio del proyecto o cuando hay cambios estructurales (ej. definir una nueva funcionalidad, entidad o regla de negocio). Es planificación, no se hace a diario.
 * **🔄 Mundo 2: El Micro-Ciclo (Fases 9 y 10 - Ejecución y TDD):** Es el bucle iterativo ágil donde el desarrollador vive el 90% del tiempo. Tomas la especificación del Macro-Ciclo, la divides en tareas (Fase 9) y aplicas pruebas y código (Fase 10) repetidamente.
 
 > **Regla Inquebrantable:** NUNCA pases al Micro-Ciclo (Escribir Código) sin tener validado el Macro-Ciclo (Especificación de Diseño).
 
 ### ✅ Quality Gates (Puntos de Control)
 
-Inspiradas en [GitHub Spec-Kit](https://github.com/github/spec-kit) (`clarify` / `checklist` / `analyze`) e integradas dentro de las fases existentes para no romper el flujo de 10. Cada proyecto nuevo se siembra con estas secciones ya incluidas en sus plantillas:
+Inspiradas en [GitHub Spec-Kit](https://github.com/github/spec-kit) (`clarify` / `checklist` / `analyze`) e integradas dentro de las fases existentes en lugar de añadir fases nuevas. Cada proyecto nuevo se siembra con estas secciones ya incluidas en sus plantillas:
 
 | Gate | Vive al final de | Bloquea el avance a | Qué valida |
 |------|------------------|---------------------|------------|
@@ -143,7 +145,7 @@ src/
     ports/                     # AiProvider, ProjectRepository, ProjectArchiver, FileSystemPort
     security/                  # PasswordHasher, UserRepository
     ProjectPath.ts             # Value Object anti-traversal
-    ProjectTemplates.ts        # 10 plantillas de fase (readonly)
+    ProjectTemplates.ts        # 11 plantillas de fase (readonly)
     Specification.ts / Task.ts
   application/usecases/        # 1 caso de uso por operación de usuario
   infrastructure/

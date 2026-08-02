@@ -65,14 +65,15 @@ describe('WorkspaceRouter', () => {
   });
 
   describe('POST /projects', () => {
-    it('crea un proyecto y siembra las 10 plantillas', async () => {
+    it('crea un proyecto y siembra las 11 plantillas', async () => {
       const res = await request(buildApp())
         .post('/api/workspace/projects')
         .set('Authorization', `Bearer ${architectToken()}`)
         .send({ projectName: 'demo' });
       expect(res.status).toBe(200);
       const docs = await fs.readdir(path.join(tempDir, 'demo', 'docs'));
-      expect(docs).toHaveLength(10);
+      expect(docs).toHaveLength(11);
+      expect(docs).toContain('00-requerimientos.md');
       expect(docs).toContain('01-constitucion.md');
     });
 

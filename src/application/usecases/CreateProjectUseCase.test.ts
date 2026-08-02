@@ -33,7 +33,7 @@ const fakeFs = () => {
 };
 
 describe('CreateProjectUseCase', () => {
-  it('crea el proyecto y siembra las 10 plantillas en docs/', async () => {
+  it('crea el proyecto y siembra las 11 plantillas en docs/', async () => {
     const { repo, created } = stubRepo();
     const { port, writes } = fakeFs();
     const uc = new CreateProjectUseCase(repo, () => port);

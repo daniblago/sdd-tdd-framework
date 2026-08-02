@@ -13,7 +13,7 @@
 
 ## 1. Propósito
 
-Persistir artefactos documentales por proyecto SDD a lo largo de 10 fases (Constitución →
+Persistir artefactos documentales por proyecto SDD a lo largo de 11 fases (Requerimientos →
 Implementación), autenticar por rol, sellar proyectos cuando el diseño está validado, y
 orquestar drafting con IA (Gemini, OpenAI, Anthropic).
 
@@ -68,7 +68,7 @@ Un ticket emitido para el proyecto A no funciona para descargar el proyecto B.
 
 ### Proyectos (autenticado)
 - `GET /api/workspace/projects` — lista proyectos (cualquier rol)
-- `POST /api/workspace/projects` — crea proyecto + siembra 10 plantillas
+- `POST /api/workspace/projects` — crea proyecto + siembra 11 plantillas
   (**ARCHITECT only**; 409 si ya existe)
 
 ### Sellado (autenticado)

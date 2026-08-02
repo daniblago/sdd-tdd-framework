@@ -214,7 +214,7 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
     post:
       tags: [projects]
-      summary: Crea un proyecto nuevo y siembra las 10 plantillas de documentación
+      summary: Crea un proyecto nuevo y siembra las 11 plantillas de documentación
       security: [{ bearerAuth: [] }]
       requestBody:
         required: true
